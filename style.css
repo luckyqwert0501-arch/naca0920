@@ -1,0 +1,236 @@
+/* ============================================================
+   好日集 NANACACA — 代購管理平台 design tokens
+   Palette: warm washi paper + aizome (Japanese indigo) accent
+   ============================================================ */
+:root{
+  --paper: #FAF6EF;
+  --paper-raised: #FFFFFF;
+  --ink: #262523;
+  --ink-soft: #6B655C;
+  --line: #E4DCCB;
+  --aizome: #2F4157;      /* deep indigo — primary accent */
+  --aizome-soft: #4A6382;
+  --kinari-gold: #B8863B; /* totals / money */
+  --sakura: #C97C6D;      /* warnings / pending */
+  --matcha: #5C7A5E;      /* paid / success */
+  --danger: #B4453A;
+
+  --radius-s: 6px;
+  --radius-m: 10px;
+  --shadow-card: 0 1px 2px rgba(38,37,35,.06), 0 4px 14px rgba(38,37,35,.05);
+
+  --font-display: "Shippori Mincho", "Noto Serif TC", "Noto Serif JP", serif;
+  --font-body: "Zen Kaku Gothic New", "Noto Sans TC", "Hiragino Sans", system-ui, sans-serif;
+}
+
+*{ box-sizing:border-box; }
+html,body{ margin:0; padding:0; }
+body{
+  background:var(--paper);
+  color:var(--ink);
+  font-family:var(--font-body);
+  font-size:16px;
+  line-height:1.65;
+  -webkit-font-smoothing:antialiased;
+}
+h1,h2,h3{ font-family:var(--font-display); font-weight:600; margin:0 0 .45em; letter-spacing:.01em; }
+h1{ font-size:1.6rem; }
+h2{ font-size:1.25rem; }
+h3{ font-size:1.05rem; color:var(--ink-soft); font-weight:600; }
+a{ color:var(--aizome); }
+button{ font-family:inherit; }
+p.hint{ color:var(--ink-soft); font-size:.88rem; margin:-6px 0 14px; line-height:1.6; }
+
+/* ---------- App shell ---------- */
+.app-shell{ display:flex; min-height:100vh; }
+
+.sidenav{
+  width:200px; flex-shrink:0;
+  background:var(--aizome);
+  color:#EFE9DC;
+  display:flex; flex-direction:column;
+  padding:20px 0;
+}
+.sidenav .brand{
+  font-family:var(--font-display);
+  font-size:1.15rem;
+  padding:0 20px 18px;
+  border-bottom:1px solid rgba(239,233,220,.18);
+  margin-bottom:10px;
+}
+.sidenav .brand small{ display:block; font-family:var(--font-body); font-size:.7rem; opacity:.65; margin-top:2px; }
+.sidenav nav{ display:flex; flex-direction:column; }
+.sidenav a{
+  color:#EFE9DC; text-decoration:none;
+  padding:11px 20px; font-size:.92rem;
+  border-left:3px solid transparent;
+  opacity:.8;
+}
+.sidenav a:hover{ background:rgba(255,255,255,.06); opacity:1; }
+.sidenav a.active{ opacity:1; border-left-color:var(--kinari-gold); background:rgba(255,255,255,.08); font-weight:600; }
+.sidenav .lock-btn{
+  margin:16px 20px 0; padding:8px 10px; text-align:left;
+  background:transparent; border:1px solid rgba(239,233,220,.3);
+  color:#EFE9DC; border-radius:var(--radius-s); cursor:pointer; font-size:.8rem;
+}
+
+.main{ flex:1; min-width:0; padding:32px 40px 100px; max-width:1220px; }
+.main-header{ display:flex; align-items:baseline; justify-content:space-between; margin-bottom:26px; gap:12px; flex-wrap:wrap; }
+.period-pill{
+  font-size:.82rem; color:var(--aizome); background:#EAF0F5;
+  border:1px solid #D6E1E9; padding:5px 12px; border-radius:999px;
+}
+select.period-pill{
+  font-family:inherit; cursor:pointer; min-height:auto; -webkit-appearance:none; appearance:none;
+  padding-right:26px;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%232F4157'/%3E%3C/svg%3E");
+  background-repeat:no-repeat; background-position:right 10px center;
+}
+
+/* ---------- Cards / forms ---------- */
+.card{ background:var(--paper-raised); border:1px solid var(--line); border-radius:var(--radius-m); box-shadow:var(--shadow-card); padding:24px 26px; margin-bottom:20px; }
+.card + .card{ margin-top:0; }
+.field{ display:flex; flex-direction:column; gap:7px; margin-bottom:16px; }
+.field label{ font-size:.85rem; color:var(--ink-soft); font-weight:500; }
+.field input, .field select, .field textarea{
+  font-family:inherit; font-size:1rem; padding:12px 14px;
+  border:1.5px solid var(--line); border-radius:var(--radius-s);
+  background:#fff; color:var(--ink);
+  min-height:46px;
+}
+.field textarea{ min-height:auto; }
+.field input:focus, .field select:focus, .field textarea:focus{
+  outline:2px solid var(--aizome-soft); outline-offset:1px; border-color:var(--aizome-soft);
+}
+input[type="number"]{ -moz-appearance:textfield; }
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button{ -webkit-appearance:none; margin:0; }
+.row{ display:flex; gap:16px; flex-wrap:wrap; }
+.row > .field{ flex:1; min-width:180px; }
+
+.btn{
+  display:inline-flex; align-items:center; justify-content:center;
+  border:none; border-radius:var(--radius-s); padding:12px 20px;
+  font-size:.96rem; cursor:pointer; font-weight:600;
+  min-height:46px; text-decoration:none; box-sizing:border-box;
+}
+button.btn{ font-family:inherit; }
+.btn-primary{ background:var(--aizome); color:#fff; }
+.btn-primary:hover{ background:var(--aizome-soft); }
+.btn-ghost{ background:transparent; color:var(--aizome); border:1.5px solid var(--line); }
+.btn-ghost:hover{ background:#F1ECE0; }
+.btn-danger{ background:transparent; color:var(--danger); border:1.5px solid #E7CFC9; }
+.btn-small{ padding:8px 14px; font-size:.82rem; min-height:auto; }
+
+/* ---------- Tables (grid quick-entry) ---------- */
+table.grid{ width:100%; border-collapse:collapse; font-size:.92rem; }
+table.grid th{ text-align:left; font-weight:600; color:var(--ink-soft); font-size:.78rem; padding:10px 10px; border-bottom:2px solid var(--line); white-space:nowrap; }
+table.grid td{ padding:8px 8px; border-bottom:1px solid #F0EADD; vertical-align:middle; }
+table.grid td input, table.grid td select{
+  width:100%; min-width:88px; border:1.5px solid transparent; background:transparent;
+  padding:10px 10px; border-radius:var(--radius-s); font-size:.94rem; min-height:40px;
+}
+table.grid td input:hover, table.grid td select:hover{ border-color:var(--line); }
+table.grid td input:focus, table.grid td select:focus{ border-color:var(--aizome-soft); background:#fff; outline:none; }
+table.grid td input[type="file"]{ padding:6px 4px; min-height:auto; }
+table.grid tbody tr{ border-bottom:1px solid var(--line); }
+table.grid tbody tr:hover{ background:#FBF8F1; }
+.grid-wrap{ overflow-x:auto; }
+
+/* On narrow screens, turn each grid row into a labeled card instead of
+   squeezing a wide table sideways. */
+@media (max-width: 760px){
+  .grid-wrap{ overflow-x:visible; }
+  table.grid thead{ display:none; }
+  table.grid, table.grid tbody, table.grid tr, table.grid td{ display:block; width:100%; }
+  table.grid tr{
+    border:1px solid var(--line); border-radius:var(--radius-m);
+    padding:6px 12px; margin-bottom:14px; background:#fff;
+  }
+  table.grid td{
+    display:flex; align-items:center; justify-content:space-between; gap:10px;
+    border-bottom:1px dashed #F0EADD; padding:10px 0;
+  }
+  table.grid td:last-child{ border-bottom:none; }
+  table.grid td[data-label]:not([data-label=""])::before{
+    content: attr(data-label); flex:0 0 auto; font-size:.78rem; color:var(--ink-soft); font-weight:600;
+  }
+  table.grid td input, table.grid td select{ text-align:right; max-width:62%; margin-left:auto; }
+  table.grid td[data-label=""] { justify-content:flex-end; }
+  table.grid td[data-label=""] button{ width:100%; }
+}
+
+/* ---------- Plain read-only tables (always stays a real table, e.g. A4 slip) ---------- */
+table.data-table{ width:100%; border-collapse:collapse; font-size:.92rem; }
+table.data-table th{ text-align:left; font-weight:600; color:var(--ink-soft); font-size:.78rem; padding:9px 8px; border-bottom:2px solid var(--line); }
+table.data-table td{ padding:9px 8px; border-bottom:1px solid #F0EADD; }
+
+/* ---------- Badges / status ---------- */
+.badge{ display:inline-block; font-size:.72rem; padding:2px 9px; border-radius:999px; font-weight:600; }
+.badge-pending{ background:#F6E9E3; color:var(--sakura); }
+.badge-paid{ background:#E7EFE6; color:var(--matcha); }
+.badge-review{ background:#FBEFD6; color:var(--kinari-gold); }
+.badge-done{ background:#E3E8ED; color:var(--aizome); }
+
+/* ---------- Quick-access tiles (dashboard) ---------- */
+.quick-links{ display:grid; grid-template-columns:repeat(auto-fit, minmax(160px, 1fr)); gap:14px; }
+.quick-links a{
+  display:flex; flex-direction:column; gap:4px;
+  padding:18px 18px; border-radius:var(--radius-m);
+  background:#F5F0E5; border:1px solid var(--line);
+  text-decoration:none; color:var(--ink);
+  transition:transform .08s ease, box-shadow .08s ease;
+}
+.quick-links a:hover{ box-shadow:var(--shadow-card); transform:translateY(-1px); }
+.quick-links a .qtitle{ font-family:var(--font-display); font-size:1.02rem; color:var(--aizome); }
+.quick-links a .qdesc{ font-size:.8rem; color:var(--ink-soft); }
+
+/* ---------- Cart / order build ---------- */
+.cart-line{ display:flex; justify-content:space-between; align-items:center; gap:10px; padding:11px 0; border-bottom:1px dashed var(--line); font-size:.94rem; }
+.cart-total{ display:flex; justify-content:space-between; font-family:var(--font-display); font-size:1.25rem; padding-top:12px; color:var(--kinari-gold); }
+
+/* ---------- Login gate ---------- */
+.lock-screen{ min-height:100vh; display:flex; align-items:center; justify-content:center; background:var(--aizome); padding:20px; }
+.lock-card{ background:var(--paper); padding:34px 30px; border-radius:var(--radius-m); width:100%; max-width:340px; text-align:center; }
+.lock-card .brand-mark{ font-family:var(--font-display); font-size:1.4rem; margin-bottom:4px; }
+.lock-card p{ color:var(--ink-soft); font-size:.85rem; margin-top:0; }
+.lock-card input{ width:100%; text-align:center; font-size:1.1rem; letter-spacing:.15em; padding:10px; margin:14px 0; border-radius:var(--radius-s); border:1px solid var(--line); }
+.lock-error{ color:var(--danger); font-size:.8rem; min-height:1.2em; }
+
+/* ---------- Public remittance page ---------- */
+.public-page{ max-width:440px; margin:0 auto; padding:40px 18px 60px; }
+.public-page .brand-mark{ font-family:var(--font-display); font-size:1.3rem; text-align:center; margin-bottom:2px; }
+.public-page .sub{ text-align:center; color:var(--ink-soft); font-size:.85rem; margin-bottom:24px; }
+.notice-box{ background:#EAF0F5; border:1px solid #D6E1E9; padding:12px 14px; border-radius:var(--radius-s); font-size:.85rem; color:var(--aizome); margin-bottom:18px; }
+.success-box{ background:#E7EFE6; border:1px solid #CFE0CE; padding:16px; border-radius:var(--radius-s); color:var(--matcha); text-align:center; }
+
+/* ---------- Print (A4 packing slip) ---------- */
+@media print{
+  .no-print{ display:none !important; }
+  .app-shell, .main{ all:unset; display:block; }
+  body{ background:#fff; }
+  .print-sheet{ width:190mm; margin:0 auto; }
+}
+
+/* ---------- Responsive ---------- */
+@media (max-width: 820px){
+  .app-shell{ flex-direction:column; }
+  .sidenav{
+    width:100%; flex-direction:row; align-items:center;
+    padding:10px 12px; position:sticky; top:0; z-index:20;
+    overflow-x:auto;
+  }
+  .sidenav .brand{ border:none; padding:0 12px 0 4px; margin:0; white-space:nowrap; }
+  .sidenav .brand small{ display:none; }
+  .sidenav nav{ flex-direction:row; }
+  .sidenav a{ border-left:none; border-bottom:3px solid transparent; padding:8px 12px; white-space:nowrap; }
+  .sidenav a.active{ border-left-color:transparent; border-bottom-color:var(--kinari-gold); }
+  .sidenav .lock-btn{ display:none; }
+  .main{ padding:18px 14px 90px; }
+  .row > .field{ min-width:120px; }
+}
+@media (max-width: 480px){
+  .main{ padding:14px 10px 90px; }
+  table.grid{ font-size:.78rem; }
+  .card{ padding:14px; }
+}

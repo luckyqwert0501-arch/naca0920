@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>顧客入單 － 代購管理平台</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<script src="data.js"></script>
+<script src="nav.js"></script>
+<script>
+ncBoot("order.html", "顧客入單", (el) => {
+  const settings = DB.getSettings();
+  const batch = DB.listBatches().find(b => b.id === settings.currentBatchId);
+  if (!batch) { el.innerHTML = `<div class="card">請先到「總覽」建立期別。</div>`; return; }
+
+  // in-memory cart for this session: [{productId, qty, holdId}]
+  let cart = [];
+  let step = 1;
+  let customer = { name: "", phone: "", lineName: "" };
+
+  function productsCached() { return DB.listProducts(batch.id); }
+
+  function cartSeriesQty(seriesName, excludeProductId) {
+    return cart.filter(l => {
+      const p = productsCached().find(x => x.id === l.productId);
+      return p && p.series === seriesName;
+    }).reduce((s, l) => s + l.qty, 0);
+  }
+
+  function priceForLine(product) {
+    const rules = DB.rulesForSeries(product.series, batch.id);
+    const seriesQty = cartSeriesQty(product.series);
+    return tieredUnitPrice(Number(product.sellPrice) || 0, rules, seriesQty || 1);
+  }
+
+  function renderStep1() {
+    const products = productsCached();
+    const existingCustomer = customer.phone ? DB.findCustomerByPhone(customer.phone) : null;
+    const openOrder = existingCustomer ? DB.findOpenOrderForCustomer(existingCustomer.id, batch.id) : null;
+
+    el.innerHTML = `
+      <div class="card">
+        <h2>顧客資料</h2>
+        <div class="row">
+          <div class="field"><label>電話（顧客識別依據）</label><input id="custPhone" value="${customer.phone}"/></div>
+          <div class="field"><label>姓名</label><input id="custName" value="${customer.name}"/></div>
+          <div class="field"><label>Line名稱</label><input id="custLine" value="${customer.lineName}"/></div>
+        </div>
+        ${openOrder ? `<p style="color:var(--matcha); font-size:.85rem;">此顧客本期已有訂單，這次加單會併入同一張訂單、不重複收運費。</p>` : ""}
+      </div>
+
+      <div class="card">
+        <h2>選擇商品加入購物車</h2>
+        <div class="row">
+          <div class="field" style="flex:2"><label>商品</label>
+            <select id="prodSelect">
+              <option value="">－ 選擇商品 －</option>
+              ${products.map(p => `<option value="${p.id}" ${DB.availableStock(p) <= 0 ? "disabled" : ""}>${p.name}（餘${DB.availableStock(p)}）－ NT$${p.sellPrice}</option>`).join("")}
+            </select>
+          </div>
+          <div class="field" style="max-width:100px"><label>數量</label><input id="prodQty" type="number" value="1" min="1"/></div>
+          <div class="field" style="justify-content:flex-end"><button class="btn btn-primary" id="addToCartBtn">加入購物車</button></div>
+        </div>
+        <div id="cartErr" style="color:var(--danger); font-size:.85rem;"></div>
+      </div>
+
+      <div class="card">
+        <h2>購物車</h2>
+        <div id="cartLines"></div>
+        <div class="cart-total"><span>小計</span><span id="cartSubtotal">NT$0</span></div>
+        <div class="row" style="margin-top:14px;">
+          <button class="btn btn-ghost" id="backHomeBtn">回總覽</button>
+          <button class="btn btn-primary" id="nextStepBtn" style="margin-left:auto;">下一步：填寫收件資訊 →</button>
+        </div>
+      </div>`;
+
+    document.getElementById("custPhone").addEventListener("input", e => {
+      customer.phone = e.target.value;
+      const found = DB.findCustomerByPhone(customer.phone);
+      if (found) { customer.name = found.name; customer.lineName = found.lineName; renderStep1(); }
+    });
+    document.getElementById("custName").addEventListener("input", e => customer.name = e.target.value);
+    document.getElementById("custLine").addEventListener("input", e => customer.lineName = e.target.value);
+    document.getElementById("backHomeBtn").addEventListener("click", () => location.href = "index.html");
+
+    document.getElementById("addToCartBtn").addEventListener("click", () => {
+      const pid = document.getElementById("prodSelect").value;
+      const qty = Number(document.getElementById("prodQty").value) || 1;
+      const errEl = document.getElementById("cartErr");
+      errEl.textContent = "";
+      if (!pid) { errEl.textContent = "請先選擇商品"; return; }
+      const hold = DB.holdStock(pid, qty);
+      if (!hold.ok) { errEl.textContent = hold.msg; return; }
+      cart.push({ productId: pid, qty, holdId: hold.hold.id });
+      renderStep1();
+    });
+
+    document.getElementById("nextStepBtn").addEventListener("click", () => {
+      if (!customer.phone || !customer.name) { alert("請填寫顧客姓名與電話"); return; }
+      if (!cart.length) { alert("購物車是空的"); return; }
+      step = 2;
+      renderStep2();
+    });
+
+    renderCartLines();
+  }
+
+  function renderCartLines() {
+    const wrap = document.getElementById("cartLines");
+    if (!wrap) return;
+    const products = productsCached();
+    let subtotal = 0;
+    wrap.innerHTML = cart.map((line, idx) => {
+      const p = products.find(x => x.id === line.productId);
+      const unit = priceForLine(p);
+      const lineTotal = unit * line.qty;
+      subtotal += lineTotal;
+      return `<div class="cart-line">
+        <span>${p.name} × ${line.qty}${unit !== Number(p.sellPrice) ? " <em style='color:var(--matcha)'>(組合價)</em>" : ""}</span>
+        <span>${ncFmt(lineTotal)} <button class="btn btn-ghost btn-small" data-idx="${idx}">移除</button></span>
+      </div>`;
+    }).join("") || `<p style="color:var(--ink-soft)">尚未加入商品</p>`;
+    document.getElementById("cartSubtotal").textContent = ncFmt(subtotal);
+    wrap.querySelectorAll("button[data-idx]").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const idx = Number(btn.dataset.idx);
+        DB.releaseHold(cart[idx].holdId);
+        cart.splice(idx, 1);
+        renderStep1();
+      });
+    });
+  }
+
+  function renderStep2() {
+    const existingCustomer = DB.findCustomerByPhone(customer.phone);
+    const isReturning = existingCustomer && DB.findOpenOrderForCustomer(existingCustomer.id, batch.id);
+    el.innerHTML = `
+      <div class="card">
+        <h2>收件與寄送資訊</h2>
+        <div class="row">
+          <div class="field"><label>收件人姓名</label><input id="rName" value="${customer.name}"/></div>
+          <div class="field"><label>收件人電話</label><input id="rPhone" value="${customer.phone}"/></div>
+        </div>
+        <div class="field"><label>收件地址</label><input id="rAddr" value="${existingCustomer ? (existingCustomer.address||"") : ""}"/></div>
+        <div class="field"><label>寄送方式</label>
+          <select id="rShip">
+            ${DB.listShippingMethods().map(m=>`<option value="${m.id}" data-fee="${m.fee}">${m.name}（建議運費 NT$${m.fee}）</option>`).join("")}
+          </select>
+        </div>
+        ${isReturning ? `<p style="color:var(--ink-soft); font-size:.85rem;">此為加單，運費不會重複收取。</p>` :
+          `<div class="field" style="max-width:160px"><label>本次運費 (TWD)</label><input id="rShipFee" type="number" value="${DB.listShippingMethods()[0]?.fee||0}"/></div>`}
+      </div>
+      <div class="row">
+        <button class="btn btn-ghost" id="backBtn">← 返回購物車</button>
+        <button class="btn btn-primary" id="submitBtn" style="margin-left:auto;">送出訂單</button>
+      </div>`;
+    document.getElementById("backBtn").addEventListener("click", () => { step = 1; renderStep1(); });
+    const shipSelect = document.getElementById("rShip");
+    const shipFeeInput = document.getElementById("rShipFee");
+    if (shipSelect && shipFeeInput) {
+      shipSelect.addEventListener("change", () => {
+        shipFeeInput.value = shipSelect.selectedOptions[0].dataset.fee;
+      });
+    }
+    document.getElementById("submitBtn").addEventListener("click", () => {
+      const products = productsCached();
+      const cartLines = cart.map(l => {
+        const p = products.find(x => x.id === l.productId);
+        return { productId: l.productId, qty: l.qty, unitPrice: priceForLine(p) };
+      });
+      const shippingTWD = isReturning ? 0 : Number(document.getElementById("rShipFee").value) || 0;
+      const result = DB.submitOrder({
+        customer: { name: customer.name, phone: customer.phone, lineName: customer.lineName,
+          address: document.getElementById("rAddr").value },
+        batchId: batch.id,
+        cartLines,
+        holdIds: cart.map(l => l.holdId),
+        shippingTWD,
+        recipient: {
+          name: document.getElementById("rName").value,
+          phone: document.getElementById("rPhone").value,
+          address: document.getElementById("rAddr").value,
+          shipMethod: document.getElementById("rShip").selectedOptions[0].textContent
+        }
+      });
+      location.href = "orders.html?order=" + result.order.id;
+    });
+  }
+
+  renderStep1();
+});
+</script>
+</body>
+</html>

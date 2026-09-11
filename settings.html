@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>設定 － 代購管理平台</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<script src="data.js"></script>
+<script src="nav.js"></script>
+<script>
+ncBoot("settings.html", "設定", (el) => {
+  function render() {
+    const settings = DB.getSettings();
+    const batches = DB.listBatches();
+    const currentBatch = batches.find(b => b.id === settings.currentBatchId);
+    const methods = DB.listShippingMethods();
+
+    el.innerHTML = `
+      <div class="card">
+        <h2>代購品牌名稱</h2>
+        <p class="hint">會顯示在出貨單抬頭與匯款通知開頭。</p>
+        <div class="field"><input id="communityName" value="${settings.communityName||""}"/></div>
+      </div>
+
+      <div class="card">
+        <h2>期別管理</h2>
+        <div class="row">
+          <div class="field" style="flex:2"><label>目前使用中期別</label>
+            <select id="currentBatch">
+              ${batches.map(b => `<option value="${b.id}" ${b.id===settings.currentBatchId?"selected":""}>${b.name}</option>`).join("")}
+            </select>
+          </div>
+        </div>
+        <div class="row">
+          <div class="field" style="flex:2"><label>新增期別名稱</label><input id="newBatchName" placeholder="例：2026/09 東京"/></div>
+          <div class="field" style="justify-content:flex-end"><button class="btn btn-ghost" id="addBatchBtn">新增期別</button></div>
+        </div>
+      </div>
+
+      ${currentBatch ? `
+      <div class="card">
+        <h2>本期匯款帳戶</h2>
+        <p class="hint">每一期收款帳戶可能不同，切換期別後記得確認這裡的資料。</p>
+        <div class="row">
+          <div class="field"><label>銀行代碼</label><input id="bankCode" value="${currentBatch.bankCode||""}"/></div>
+          <div class="field"><label>帳號</label><input id="bankAccount" value="${currentBatch.bankAccount||""}"/></div>
+          <div class="field"><label>戶名</label><input id="bankHolder" value="${currentBatch.bankHolder||""}"/></div>
+        </div>
+      </div>` : ""}
+
+      <div class="card">
+        <h2>寄送方式設定</h2>
+        <p class="hint">這裡設定的選項，會出現在「顧客入單」的寄送方式下拉選單。運費會先帶入建議金額，仍可在建單時修改。</p>
+        <div class="grid-wrap">
+          <table class="grid" id="shipTable">
+            <thead><tr><th>寄送方式名稱</th><th>建議運費(TWD)</th><th></th></tr></thead>
+            <tbody id="shipTbody"></tbody>
+          </table>
+        </div>
+        <button class="btn btn-ghost btn-small" id="addShipBtn" style="margin-top:10px;">＋ 新增寄送方式</button>
+      </div>
+
+      <div class="card">
+        <h2>購物車保留時數</h2>
+        <p class="hint">加入購物車後預扣的庫存，超過這個時數沒送出訂單就自動釋放。</p>
+        <div class="field" style="max-width:160px"><input id="cartHoldHours" type="number" value="${settings.cartHoldHours}"/></div>
+      </div>
+
+      <div class="card">
+        <h2>存取密碼</h2>
+        <p class="hint">整站共用一組密碼，僅供操作者自己使用，防止路人誤闖，不是高強度加密。</p>
+        <div class="field" style="max-width:260px"><input id="password" type="password" value="${settings.password||""}"/></div>
+      </div>`;
+
+    document.getElementById("communityName").addEventListener("change", e => DB.saveSettings({ communityName: e.target.value }));
+    document.getElementById("currentBatch").addEventListener("change", e => { DB.saveSettings({ currentBatchId: e.target.value }); render(); });
+    document.getElementById("cartHoldHours").addEventListener("change", e => DB.saveSettings({ cartHoldHours: e.target.value }));
+    document.getElementById("password").addEventListener("change", e => DB.saveSettings({ password: e.target.value }));
+    document.getElementById("addBatchBtn").addEventListener("click", () => {
+      const name = document.getElementById("newBatchName").value.trim();
+      if (!name) return;
+      DB.createBatch({ name, bankCode: "", bankAccount: "", bankHolder: "" });
+      render();
+    });
+
+    if (currentBatch) {
+      ["bankCode","bankAccount","bankHolder"].forEach(k => {
+        document.getElementById(k).addEventListener("change", e => DB.updateBatch(currentBatch.id, { [k]: e.target.value }));
+      });
+    }
+
+    const shipTbody = document.getElementById("shipTbody");
+    methods.forEach(m => shipTbody.appendChild(shipRow(m)));
+    document.getElementById("addShipBtn").addEventListener("click", () => shipTbody.appendChild(shipRow(null)));
+  }
+
+  function shipRow(m) {
+    const tr = document.createElement("tr");
+    const data = m || { id: null, name: "", fee: "" };
+    tr.innerHTML = `
+      <td data-label="寄送方式名稱"><input data-k="name" value="${data.name}" placeholder="例：面交"/></td>
+      <td data-label="建議運費(TWD)"><input data-k="fee" type="number" value="${data.fee}"/></td>
+      <td data-label=""><button class="btn btn-danger btn-small delShipBtn">刪除</button></td>`;
+    function save() {
+      const rec = { id: data.id };
+      tr.querySelectorAll("[data-k]").forEach(i => rec[i.dataset.k] = i.value);
+      if (!rec.name) return;
+      const saved = DB.upsertShippingMethod(rec);
+      data.id = saved.id;
+    }
+    tr.querySelectorAll("input").forEach(i => i.addEventListener("input", save));
+    tr.querySelector(".delShipBtn").addEventListener("click", () => {
+      if (data.id) DB.deleteShippingMethod(data.id);
+      tr.remove();
+    });
+    return tr;
+  }
+
+  render();
+});
+</script>
+</body>
+</html>

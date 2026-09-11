@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>商品輸入 － 代購管理平台</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<script src="data.js"></script>
+<script src="nav.js"></script>
+<script>
+ncBoot("products.html", "商品輸入", (el) => {
+  const settings = DB.getSettings();
+  const batch = DB.listBatches().find(b => b.id === settings.currentBatchId);
+  if (!batch) { el.innerHTML = `<div class="card">請先到「總覽」建立期別。</div>`; return; }
+
+  function renderTable() {
+    const products = DB.listProducts(batch.id);
+    el.innerHTML = `
+      <div class="card">
+        <h2>庫存總覽</h2>
+        <div class="grid-wrap">
+          <table class="grid">
+            <thead><tr><th>商品名稱</th><th>成本</th><th>售價</th><th>利潤</th><th>可售庫存</th></tr></thead>
+            <tbody id="invTbody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>快速輸入（Tab 鍵可在欄位間跳動，一列填完自動新增下一列）</h2>
+        <p class="hint">勾選「常態商品」的品項，之後在設定頁建立新期別時會自動帶入，不用每次重打。</p>
+        <div class="grid-wrap">
+          <table class="grid" id="pTable">
+            <thead><tr>
+              <th>採購方式</th><th>系列</th><th>商品名稱</th><th>日幣金額</th>
+              <th>刷卡手續費%</th><th>退稅手續費%</th><th>匯率</th><th>重量(公斤)</th>
+              <th>運費(自動)</th><th>成本TWD(自動)</th><th>售價</th><th>庫存</th><th>發票</th><th>常態商品</th><th></th>
+            </tr></thead>
+            <tbody id="pTbody"></tbody>
+          </table>
+        </div>
+        <button class="btn btn-ghost btn-small" id="addRowBtn" style="margin-top:8px;">＋ 新增一列</button>
+      </div>
+
+      <div class="card">
+        <h2>系列組合價規則</h2>
+        <p style="color:var(--ink-soft); font-size:.85rem; margin-top:-6px;">同一「系列」的商品，購物車累計件數達門檻時，套用門檻單價（例如畢業毛巾滿3件變299）。</p>
+        <div class="grid-wrap">
+          <table class="grid" id="rTable">
+            <thead><tr><th>系列名稱</th><th>門檻件數</th><th>門檻後單價</th><th></th></tr></thead>
+            <tbody id="rTbody"></tbody>
+          </table>
+        </div>
+        <button class="btn btn-ghost btn-small" id="addRuleBtn" style="margin-top:8px;">＋ 新增規則</button>
+      </div>`;
+
+    const tbody = document.getElementById("pTbody");
+    products.forEach(p => tbody.appendChild(productRow(p)));
+    document.getElementById("addRowBtn").addEventListener("click", () => tbody.appendChild(productRow(null)));
+
+    const rtbody = document.getElementById("rTbody");
+    DB.state.seriesRules.filter(r => r.batchId === batch.id).forEach(r => rtbody.appendChild(ruleRow(r)));
+    document.getElementById("addRuleBtn").addEventListener("click", () => rtbody.appendChild(ruleRow(null)));
+
+    renderInventory();
+  }
+
+  function renderInventory() {
+    const invTbody = document.getElementById("invTbody");
+    if (!invTbody) return;
+    const products = DB.listProducts(batch.id).filter(p => p.name);
+    invTbody.innerHTML = products.length ? products.map(p => {
+      const cost = Number(p.costTWD) || 0;
+      const sell = Number(p.sellPrice) || 0;
+      const profit = sell - cost;
+      return `<tr>
+        <td data-label="商品名稱">${p.series ? p.series + "－" + p.name : p.name}</td>
+        <td data-label="成本">${ncFmt(cost)}</td>
+        <td data-label="售價">${ncFmt(sell)}</td>
+        <td data-label="利潤" style="color:${profit>=0?'var(--matcha)':'var(--danger)'}">${ncFmt(profit)}</td>
+        <td data-label="可售庫存">${DB.availableStock(p)}</td>
+      </tr>`;
+    }).join("") : `<tr><td colspan="5" style="color:var(--ink-soft)">尚無商品</td></tr>`;
+  }
+
+  function num(v) { return v === "" || v === null || v === undefined ? 0 : Number(v); }
+
+  function productRow(p) {
+    const tr = document.createElement("tr");
+    const data = p || { id: null, batchId: batch.id, purchaseType: "親自", series: "", name: "",
+      jpyAmount: "", cardFeePct: "", taxRefundFee: "", exchangeRate: "", weightKg: "", sellPrice: "", stockQty: "", receiptPhoto: "", isStanding: false };
+
+    tr.innerHTML = `
+      <td data-label="採購方式"><select data-k="purchaseType">
+        ${["親自","代買10%","MDM","網路訂購"].map(o => `<option ${data.purchaseType===o?"selected":""}>${o}</option>`).join("")}
+      </select></td>
+      <td data-label="系列"><input data-k="series" value="${data.series||""}" placeholder="例：畢業毛巾"/></td>
+      <td data-label="商品名稱"><input data-k="name" value="${data.name||""}" placeholder="商品名稱"/></td>
+      <td data-label="日幣金額"><input data-k="jpyAmount" type="number" value="${data.jpyAmount}" /></td>
+      <td data-label="刷卡手續費%"><input data-k="cardFeePct" type="number" value="${data.cardFeePct}" /></td>
+      <td data-label="退稅手續費%"><input data-k="taxRefundFee" type="number" value="${data.taxRefundFee}" /></td>
+      <td data-label="匯率"><input data-k="exchangeRate" type="number" step="0.01" value="${data.exchangeRate}" /></td>
+      <td data-label="重量(公斤)"><input data-k="weightKg" type="number" step="0.001" placeholder="例：0.2" value="${data.weightKg}" /></td>
+      <td data-label="運費(自動)" class="shipVal" style="color:var(--ink-soft)">－</td>
+      <td data-label="成本TWD(自動)" class="costVal" style="color:var(--kinari-gold); font-weight:600;">－</td>
+      <td data-label="售價"><input data-k="sellPrice" type="number" value="${data.sellPrice}" /></td>
+      <td data-label="庫存"><input data-k="stockQty" type="number" value="${data.stockQty}" /></td>
+      <td data-label="發票照片"><input data-k="receiptPhoto" type="file" accept="image/*" /></td>
+      <td data-label="常態商品" style="text-align:center"><input data-k="isStanding" type="checkbox" style="width:22px; height:22px;" ${data.isStanding?"checked":""} /></td>
+      <td data-label=""><button class="btn btn-danger btn-small delBtn">刪除這筆</button></td>`;
+
+    let photoData = data.receiptPhoto || "";
+
+    function collect() {
+      const rec = { id: data.id, batchId: batch.id };
+      tr.querySelectorAll("[data-k]").forEach(input => {
+        if (input.type === "file") return;
+        if (input.type === "checkbox") { rec[input.dataset.k] = input.checked; return; }
+        rec[input.dataset.k] = input.value;
+      });
+      rec.receiptPhoto = photoData;
+      return rec;
+    }
+
+    function recalcAndSave() {
+      const rec = collect();
+      if (!rec.name) return; // don't save empty rows
+      const saved = DB.upsertProduct(rec);
+      data.id = saved.id;
+      tr.querySelector(".shipVal").textContent = ncFmt(saved.shippingTWD);
+      tr.querySelector(".costVal").textContent = ncFmt(saved.costTWD);
+      renderInventory();
+    }
+
+    tr.querySelectorAll("input[data-k], select[data-k]").forEach(input => {
+      input.addEventListener("input", recalcAndSave);
+    });
+    const fileInput = tr.querySelector('input[type="file"]');
+    fileInput.addEventListener("change", () => {
+      const file = fileInput.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => { photoData = reader.result; recalcAndSave(); };
+      reader.readAsDataURL(file);
+    });
+    tr.querySelector(".delBtn").addEventListener("click", () => {
+      if (data.id) DB.deleteProduct(data.id);
+      tr.remove();
+      renderInventory();
+    });
+
+    if (data.id) {
+      tr.querySelector(".shipVal").textContent = ncFmt(p.shippingTWD);
+      tr.querySelector(".costVal").textContent = ncFmt(p.costTWD);
+    }
+    return tr;
+  }
+
+  function ruleRow(r) {
+    const tr = document.createElement("tr");
+    const data = r || { id: null, batchId: batch.id, seriesName: "", thresholdQty: "", thresholdPrice: "" };
+    tr.innerHTML = `
+      <td data-label="系列名稱"><input data-k="seriesName" value="${data.seriesName||""}" placeholder="例：畢業毛巾"/></td>
+      <td data-label="門檻件數"><input data-k="thresholdQty" type="number" value="${data.thresholdQty}" /></td>
+      <td data-label="門檻後單價"><input data-k="thresholdPrice" type="number" value="${data.thresholdPrice}" /></td>
+      <td data-label=""><button class="btn btn-danger btn-small delRuleBtn">刪除這條規則</button></td>`;
+    function save() {
+      const rec = { id: data.id, batchId: batch.id };
+      tr.querySelectorAll("[data-k]").forEach(i => rec[i.dataset.k] = i.value);
+      if (!rec.seriesName) return;
+      const saved = DB.upsertSeriesRule(rec);
+      data.id = saved.id;
+    }
+    tr.querySelectorAll("input").forEach(i => i.addEventListener("input", save));
+    tr.querySelector(".delRuleBtn").addEventListener("click", () => {
+      if (data.id) DB.deleteSeriesRule(data.id);
+      tr.remove();
+    });
+    return tr;
+  }
+
+  renderTable();
+});
+</script>
+</body>
+</html>

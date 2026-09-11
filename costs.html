@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>成本利潤 － 代購管理平台</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<script src="data.js"></script>
+<script src="nav.js"></script>
+<script>
+ncBoot("costs.html", "成本利潤", (el) => {
+  const settings = DB.getSettings();
+  const batch = DB.listBatches().find(b => b.id === settings.currentBatchId);
+  if (!batch) { el.innerHTML = `<div class="card">請先到「總覽」建立期別。</div>`; return; }
+
+  function render() {
+    const cost = DB.costsFor(batch.id)[0] || {};
+    const summary = batchProfitSummary(batch.id);
+    el.innerHTML = `
+      <div class="card">
+        <h2>本次出差成本</h2>
+        <div class="row">
+          <div class="field"><label>機票</label><input id="flight" type="number" value="${cost.flight||""}"/></div>
+          <div class="field"><label>住宿</label><input id="hotel" type="number" value="${cost.hotel||""}"/></div>
+          <div class="field"><label>交通</label><input id="transport" type="number" value="${cost.transport||""}"/></div>
+          <div class="field"><label>免運負擔運費</label><input id="freeShippingSubsidy" type="number" value="${cost.freeShippingSubsidy||""}"/></div>
+        </div>
+        <div class="field"><label>備註</label><input id="note" value="${cost.note||""}"/></div>
+      </div>
+
+      <div class="card">
+        <h2>本期損益總覽</h2>
+        <div class="cart-line"><span>營收（訂單總額）</span><span>${ncFmt(summary.revenue)}</span></div>
+        <div class="cart-line"><span>進貨成本（本期商品成本 × 庫存數量，自動彙總自商品頁）</span><span>－${ncFmt(summary.cogs)}</span></div>
+        <div class="cart-line"><span>出差成本（機票／住宿／交通／免運補貼）</span><span>－${ncFmt(summary.tripCosts)}</span></div>
+        <div class="cart-total"><span>淨利</span><span>${ncFmt(summary.profit)}</span></div>
+      </div>`;
+
+    ["flight","hotel","transport","freeShippingSubsidy","note"].forEach(k => {
+      document.getElementById(k).addEventListener("change", e => {
+        DB.saveCost(batch.id, { [k]: e.target.value });
+        render();
+      });
+    });
+  }
+  render();
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>匯款回報</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<!--
+  This page is meant to be public (no password) so customers can reach it
+  from the remittance-notice message. In DEMO MODE it still loads data.js
+  and reads from the same browser's localStorage, purely so you can test
+  the whole flow on one device. Once you move to the real GAS backend
+  (see Code.gs), this page should ONLY call the GAS Web App's doPost
+  endpoint to submit the report — it must never load your admin data
+  (products, other customers, settings/password) the way the demo does.
+-->
+<script src="data.js"></script>
+<div class="public-page" id="app"></div>
+<script>
+(function () {
+  const params = new URLSearchParams(location.search);
+  const orderId = params.get("order");
+  const app = document.getElementById("app");
+  const settings = DB.getSettings();
+
+  if (!orderId || !DB.getOrder(orderId)) {
+    app.innerHTML = `
+      <div class="brand-mark">${settings.communityName||"好日集 NANACACA"}</div>
+      <div class="notice-box">找不到這張訂單，請確認您點的是店家傳給您的完整連結。</div>`;
+    return;
+  }
+
+  function render() {
+    const order = DB.getOrder(orderId);
+    app.innerHTML = `
+      <div class="brand-mark">${settings.communityName||"好日集 NANACACA"}</div>
+      <div class="sub">匯款回報</div>
+      <div class="notice-box">訂單編號：${order.id}<br/>應付金額：${ncFmt(DB.orderTotal(order.id))}</div>
+      <div class="card">
+        <div class="field"><label>您的姓名</label><input id="rName"/></div>
+        <div class="field"><label>您的電話</label><input id="rPhone"/></div>
+        <div class="field"><label>實際匯款金額</label><input id="rAmount" type="number"/></div>
+        <div class="field"><label>帳號後五碼</label><input id="rLast5" maxlength="5"/></div>
+        <div id="rErr" style="color:var(--danger); font-size:.85rem;"></div>
+        <button class="btn btn-primary" id="rSubmit" style="width:100%; margin-top:6px;">送出回報</button>
+      </div>`;
+    document.getElementById("rSubmit").addEventListener("click", () => {
+      const name = document.getElementById("rName").value.trim();
+      const phone = document.getElementById("rPhone").value.trim();
+      const amount = document.getElementById("rAmount").value;
+      const last5 = document.getElementById("rLast5").value.trim();
+      const errEl = document.getElementById("rErr");
+      if (!name || !phone || !amount || !last5) { errEl.textContent = "請完整填寫姓名、電話、金額與後五碼"; return; }
+      // --- swap point --- on the live backend this becomes a fetch() POST
+      // to your GAS Web App's doPost handler (see Code.gs submitRemittance).
+      DB.submitRemittance({ orderId, name, phone, amount: Number(amount), last5 });
+      app.innerHTML = `
+        <div class="brand-mark">${settings.communityName||"好日集 NANACACA"}</div>
+        <div class="success-box">回報成功，謝謝您！店家確認匯款後會盡快為您安排出貨。</div>`;
+    });
+  }
+  render();
+})();
+</script>
+</body>
+</html>

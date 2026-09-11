@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>訂單 － 代購管理平台</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<script src="data.js"></script>
+<script src="nav.js"></script>
+<script>
+const STATUS_BADGE = {
+  "待付款": "badge-pending", "待核對": "badge-review", "已付款": "badge-paid",
+  "已出貨": "badge-done", "已完成": "badge-done", "已取消": "badge-pending"
+};
+
+ncBoot("orders.html", "訂單", (el) => {
+  const settings = DB.getSettings();
+  const batch = DB.listBatches().find(b => b.id === settings.currentBatchId);
+  if (!batch) { el.innerHTML = `<div class="card">請先到「總覽」建立期別。</div>`; return; }
+
+  const params = new URLSearchParams(location.search);
+  const openId = params.get("order");
+
+  let filters = { q: "", status: "", ship: "" };
+
+  function renderList() {
+    const methods = DB.listShippingMethods();
+
+    el.innerHTML = `
+      <div class="card">
+        <h2>本期匯款帳戶</h2>
+        <p class="hint">${batch.bankCode||"（尚未設定）"} ／ ${batch.bankAccount||"－"} ／ ${batch.bankHolder||"－"}
+          　<a href="settings.html">前往設定頁修改 →</a></p>
+      </div>
+      <div class="card">
+        <h2>訂單列表</h2>
+        <div class="row">
+          <div class="field" style="flex:2"><label>搜尋顧客姓名</label><input id="qInput" value="${filters.q}" placeholder="輸入姓名關鍵字"/></div>
+          <div class="field"><label>付款狀態</label>
+            <select id="statusFilter">
+              <option value="">全部</option>
+              ${["待付款","待核對","已付款","已出貨","已完成","已取消"].map(s=>`<option ${filters.status===s?"selected":""}>${s}</option>`).join("")}
+            </select>
+          </div>
+          <div class="field"><label>寄送方式</label>
+            <select id="shipFilter">
+              <option value="">全部</option>
+              ${methods.map(m=>`<option ${filters.ship===m.name?"selected":""}>${m.name}</option>`).join("")}
+            </select>
+          </div>
+        </div>
+        <div id="orderRows"></div>
+      </div>`;
+
+    document.getElementById("qInput").addEventListener("input", e => { filters.q = e.target.value; renderOrderRows(); });
+    document.getElementById("statusFilter").addEventListener("change", e => { filters.status = e.target.value; renderOrderRows(); });
+    document.getElementById("shipFilter").addEventListener("change", e => { filters.ship = e.target.value; renderOrderRows(); });
+    renderOrderRows();
+  }
+
+  function renderOrderRows() {
+    const wrap = document.getElementById("orderRows");
+    if (!wrap) return;
+    const orders = DB.listOrders(batch.id).sort((a,b) => b.createdAt - a.createdAt);
+    const filtered = orders.filter(o => {
+      const c = DB.state.customers.find(x => x.id === o.customerId);
+      if (filters.q && !(c && c.name.includes(filters.q))) return false;
+      if (filters.status && o.status !== filters.status) return false;
+      if (filters.ship && (o.recipient?.shipMethod || "") !== filters.ship) return false;
+      return true;
+    });
+    wrap.innerHTML = filtered.length ? filtered.map(o => {
+      const c = DB.state.customers.find(x => x.id === o.customerId);
+      return `<div class="cart-line">
+        <span>${c ? c.name : "－"}・${ncFmt(DB.orderTotal(o.id))}</span>
+        <span><span class="badge ${STATUS_BADGE[o.status]||""}">${o.status}</span>
+        <button class="btn btn-ghost btn-small openBtn" data-id="${o.id}">查看</button></span>
+      </div>`;
+    }).join("") : `<p style="color:var(--ink-soft)">沒有符合條件的訂單</p>`;
+    wrap.querySelectorAll(".openBtn").forEach(b => b.addEventListener("click", () => renderDetail(b.dataset.id)));
+  }
+
+  function remittanceLink(order) {
+    return location.origin + location.pathname.replace("orders.html", "remit.html") + "?order=" + order.id;
+  }
+
+  function remittanceMessage(order, customer, items) {
+    const lines = items.map(i => {
+      const p = DB.state.products.find(x => x.id === i.productId);
+      return `- ${p ? p.name : "商品"} x ${i.qty}  NT$${i.unitPrice}`;
+    }).join("\n");
+    const itemsSubtotal = items.reduce((s, i) => s + i.subtotal, 0);
+    return `【${settings.communityName}】\n訂單編號：${order.id}\n顧客姓名：${customer.name}\n\n【訂購商品】\n${lines}\n\n【費用總計】\n商品小計：${ncFmt(itemsSubtotal)}\n運費：${ncFmt(order.shippingFee)}\n總金額：${ncFmt(DB.orderTotal(order.id))}\n\n【匯款資訊】\n銀行代碼：${batch.bankCode||""}\n帳號：${batch.bankAccount||""}\n戶名：${batch.bankHolder||""}\n\n請完成匯款後點此回報金額與後五碼：\n${remittanceLink(order)}\n\n謝謝！`;
+  }
+
+  function renderDetail(orderId) {
+    const order = DB.getOrder(orderId);
+    const customer = DB.state.customers.find(c => c.id === order.customerId);
+    const items = DB.orderItemsFor(orderId);
+    const remits = DB.listRemittances(orderId);
+
+    el.innerHTML = `
+      <div class="card no-print">
+        <button class="btn btn-ghost btn-small" id="toListBtn">← 回訂單列表</button>
+      </div>
+
+      <div class="card print-sheet" id="slip">
+        <h2>${settings.communityName} － 出貨單</h2>
+        <p>訂單編號：${order.id}</p>
+        <p>收件人：${order.recipient?.name||customer.name}　電話：${order.recipient?.phone||customer.phone}</p>
+        <p>地址：${order.recipient?.address||"－"}</p>
+        <p>寄送方式：${order.recipient?.shipMethod||"－"}</p>
+        <table class="data-table"><thead><tr><th>商品系列</th><th>商品名稱</th><th>數量</th><th>單價</th><th>小計</th></tr></thead>
+        <tbody>${items.map(i => {
+          const p = DB.state.products.find(x => x.id === i.productId);
+          return `<tr><td>${p?p.series||"－":""}</td><td>${p?p.name:""}</td><td>${i.qty}</td><td>${ncFmt(i.unitPrice)}</td><td>${ncFmt(i.subtotal)}</td></tr>`;
+        }).join("")}</tbody></table>
+        <p style="text-align:right; margin:14px 0 2px;">運費：${ncFmt(order.shippingFee)}</p>
+        <p style="text-align:right; font-size:1.15rem; font-weight:700; color:var(--kinari-gold); margin-top:0;">總計：${ncFmt(DB.orderTotal(order.id))}</p>
+      </div>
+
+      <div class="card no-print">
+        <h2>訂單狀態</h2>
+        <select id="statusSelect">
+          ${["待付款","待核對","已付款","已出貨","已完成","已取消"].map(s => `<option ${s===order.status?"selected":""}>${s}</option>`).join("")}
+        </select>
+      </div>
+
+      <div class="card no-print">
+        <h2>匯款回報記錄</h2>
+        ${remits.length ? remits.map(r => `
+          <div class="cart-line">
+            <span>${r.name}／${r.phone}・回報 ${ncFmt(r.amount)}・後五碼 ${r.last5}</span>
+            <span><span class="badge ${r.status==='已核對'?'badge-paid':'badge-review'}">${r.status}</span>
+              ${r.status==='待核對'?`<button class="btn btn-primary btn-small confirmBtn" data-id="${r.id}">確認收款</button>`:""}</span>
+          </div>`).join("") : `<p style="color:var(--ink-soft)">尚無顧客回報</p>`}
+        <p class="hint" style="margin-top:14px; margin-bottom:0;">
+          顧客匯款回報頁（已附在下方的匯款通知內，顧客點連結就能打開）：<br/>
+          <a href="${remittanceLink(order)}" target="_blank">${remittanceLink(order)}</a>
+          <button class="btn btn-ghost btn-small" id="copyLinkBtn" style="margin-left:8px;">複製連結</button>
+        </p>
+      </div>
+
+      <div class="card no-print">
+        <h2>一鍵複製匯款通知</h2>
+        <textarea readonly style="width:100%; height:220px;" id="msgBox"></textarea>
+        <button class="btn btn-primary" id="copyBtn" style="margin-top:8px;">複製訊息</button>
+        <button class="btn btn-ghost" id="printBtn">列印A4出貨單</button>
+      </div>`;
+
+    document.getElementById("toListBtn").addEventListener("click", renderList);
+    document.getElementById("statusSelect").addEventListener("change", e => DB.updateOrderStatus(order.id, e.target.value));
+    el.querySelectorAll(".confirmBtn").forEach(b => b.addEventListener("click", () => { DB.confirmRemittance(b.dataset.id); renderDetail(orderId); }));
+    document.getElementById("msgBox").value = remittanceMessage(order, customer, items);
+    document.getElementById("copyBtn").addEventListener("click", () => {
+      navigator.clipboard.writeText(document.getElementById("msgBox").value);
+      document.getElementById("copyBtn").textContent = "已複製！";
+      setTimeout(() => document.getElementById("copyBtn").textContent = "複製訊息", 1500);
+    });
+    document.getElementById("copyLinkBtn").addEventListener("click", () => {
+      navigator.clipboard.writeText(remittanceLink(order));
+      document.getElementById("copyLinkBtn").textContent = "已複製！";
+      setTimeout(() => document.getElementById("copyLinkBtn").textContent = "複製連結", 1500);
+    });
+    document.getElementById("printBtn").addEventListener("click", () => window.print());
+  }
+
+  if (openId) renderDetail(openId); else renderList();
+});
+</script>
+</body>
+</html>
