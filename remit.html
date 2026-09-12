@@ -8,36 +8,45 @@
 </head>
 <body>
 <!--
-  This page is meant to be public (no password) so customers can reach it
-  from the remittance-notice message. In DEMO MODE it still loads data.js
-  and reads from the same browser's localStorage, purely so you can test
-  the whole flow on one device. Once you move to the real GAS backend
-  (see Code.gs), this page should ONLY call the GAS Web App's doPost
-  endpoint to submit the report — it must never load your admin data
-  (products, other customers, settings/password) the way the demo does.
+  這頁不含密碼保護，是給顧客用的。它只透過下面兩個 GAS 動作跟後端溝通：
+  - GET  ?action=orderSummary&id=... 讀取單一訂單的金額摘要（不會拿到其他資料）
+  - POST action=submitRemittance      送出回報
+  完全不會載入商品、其他顧客、設定密碼等後台資料。
 -->
-<script src="data.js"></script>
-<div class="public-page" id="app"></div>
+<script src="config.js"></script>
+<div class="public-page" id="app">連線中…</div>
 <script>
 (function () {
   const params = new URLSearchParams(location.search);
   const orderId = params.get("order");
   const app = document.getElementById("app");
-  const settings = DB.getSettings();
 
-  if (!orderId || !DB.getOrder(orderId)) {
-    app.innerHTML = `
-      <div class="brand-mark">${settings.communityName||"好日集 NANACACA"}</div>
-      <div class="notice-box">找不到這張訂單，請確認您點的是店家傳給您的完整連結。</div>`;
+  function fmt(n) { return "NT$" + Math.round(Number(n) || 0).toLocaleString("zh-TW"); }
+
+  if (!orderId) {
+    app.innerHTML = `<div class="notice-box">找不到這張訂單，請確認您點的是店家傳給您的完整連結。</div>`;
     return;
   }
 
-  function render() {
-    const order = DB.getOrder(orderId);
+  fetch(NC_GAS_URL + "?action=orderSummary&id=" + encodeURIComponent(orderId))
+    .then(res => res.json())
+    .then(data => {
+      if (!data.exists) {
+        app.innerHTML = `<div class="notice-box">找不到這張訂單，請確認您點的是店家傳給您的完整連結。</div>`;
+        return;
+      }
+      renderForm(data);
+    })
+    .catch(() => {
+      app.innerHTML = `<div class="notice-box">目前連線不到系統，請稍後再試一次。</div>`;
+    });
+
+  function renderForm(data) {
+    const brand = data.communityName || "好日集 NANACACA";
     app.innerHTML = `
-      <div class="brand-mark">${settings.communityName||"好日集 NANACACA"}</div>
+      <div class="brand-mark">${brand}</div>
       <div class="sub">匯款回報</div>
-      <div class="notice-box">訂單編號：${order.id}<br/>應付金額：${ncFmt(DB.orderTotal(order.id))}</div>
+      <div class="notice-box">訂單編號：${orderId}<br/>應付金額：${fmt(data.total)}</div>
       <div class="card">
         <div class="field"><label>您的姓名</label><input id="rName"/></div>
         <div class="field"><label>您的電話</label><input id="rPhone"/></div>
@@ -46,6 +55,7 @@
         <div id="rErr" style="color:var(--danger); font-size:.85rem;"></div>
         <button class="btn btn-primary" id="rSubmit" style="width:100%; margin-top:6px;">送出回報</button>
       </div>`;
+
     document.getElementById("rSubmit").addEventListener("click", () => {
       const name = document.getElementById("rName").value.trim();
       const phone = document.getElementById("rPhone").value.trim();
@@ -53,15 +63,21 @@
       const last5 = document.getElementById("rLast5").value.trim();
       const errEl = document.getElementById("rErr");
       if (!name || !phone || !amount || !last5) { errEl.textContent = "請完整填寫姓名、電話、金額與後五碼"; return; }
-      // --- swap point --- on the live backend this becomes a fetch() POST
-      // to your GAS Web App's doPost handler (see Code.gs submitRemittance).
-      DB.submitRemittance({ orderId, name, phone, amount: Number(amount), last5 });
-      app.innerHTML = `
-        <div class="brand-mark">${settings.communityName||"好日集 NANACACA"}</div>
-        <div class="success-box">回報成功，謝謝您！店家確認匯款後會盡快為您安排出貨。</div>`;
+
+      const btn = document.getElementById("rSubmit");
+      btn.disabled = true; btn.textContent = "送出中…";
+      fetch(NC_GAS_URL, {
+        method: "POST",
+        body: JSON.stringify({ action: "submitRemittance", payload: { orderId, name, phone, amount: Number(amount), last5 } })
+      }).then(() => {
+        app.innerHTML = `<div class="brand-mark">${brand}</div>
+          <div class="success-box">回報成功，謝謝您！店家確認匯款後會盡快為您安排出貨。</div>`;
+      }).catch(() => {
+        errEl.textContent = "送出失敗，請檢查網路連線後再試一次";
+        btn.disabled = false; btn.textContent = "送出回報";
+      });
     });
   }
-  render();
 })();
 </script>
 </body>

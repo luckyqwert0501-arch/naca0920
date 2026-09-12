@@ -85,12 +85,15 @@ function ncRenderShell(activeHref, contentHtml) {
 /* Call this at the top of every internal page.
    render(container) receives the #ncContent-equivalent and should build the page. */
 function ncBoot(activeHref, pageTitle, render) {
-  DB.releaseExpiredHolds();
-  const start = () => {
-    ncRenderShell(activeHref, "");
-    document.getElementById("ncPageTitle").textContent = pageTitle;
-    render(document.getElementById("ncContent"));
-  };
-  if (ncRequireUnlock()) start();
-  else ncRenderLockScreen(start);
+  document.body.innerHTML = `<div style="min-height:100vh; display:flex; align-items:center; justify-content:center; color:var(--ink-soft); font-family:var(--font-body,sans-serif);">連線中…</div>`;
+  DB.init().then(() => {
+    DB.releaseExpiredHolds();
+    const start = () => {
+      ncRenderShell(activeHref, "");
+      document.getElementById("ncPageTitle").textContent = pageTitle;
+      render(document.getElementById("ncContent"));
+    };
+    if (ncRequireUnlock()) start();
+    else ncRenderLockScreen(start);
+  });
 }

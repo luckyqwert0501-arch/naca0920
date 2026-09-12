@@ -1,14 +1,13 @@
 /* ============================================================
    NANACACA 代購管理平台 — data layer
    -------------------------------------------------------------
-   DEMO MODE: everything is read/written to localStorage so the
-   whole app works immediately with no backend setup.
-
-   GOING LIVE: replace the body of each function inside `DB` with
-   a call to your GAS Web App (see Code.gs). Keep the function
-   names/signatures the same and every page keeps working —
-   that's the whole point of isolating this file. Look for
-   "// --- swap point ---" comments below.
+   LIVE MODE: on page load, DB.init() fetches the full state from
+   your Google Apps Script backend (see Code.gs / config.js). After
+   that, every DB.* method below reads/writes the in-memory
+   `DB.state` object exactly like before — instant, no waiting —
+   and DB.save() pushes the change to the backend in the
+   background (fire-and-forget) plus keeps a local copy in
+   localStorage as an offline fallback if the network is down.
    ============================================================ */
 
 const NC_KEY = "nanacaca_v1";
@@ -30,50 +29,26 @@ function defaultShippingMethods() {
   ];
 }
 
-function ncLoad() {
-  const raw = localStorage.getItem(NC_KEY);
+// 補齊萬一缺少的欄位（例如舊資料、或後端剛建立還沒有任何資料時）
+function ncMigrate(state) {
+  state = state || {};
   const arrayFields = ["batches", "products", "seriesRules", "customers", "orders", "orderItems", "cartHolds", "costs", "remittances"];
-
-  if (raw) {
-    // Existing browsers may have saved data from before certain fields
-    // existed (e.g. shippingMethods). Backfill anything missing so older
-    // saves don't silently break newer features.
-    const state = JSON.parse(raw);
-    state.settings = state.settings || {};
-    if (state.settings.communityName === undefined) state.settings.communityName = "好日集 NANACACA";
-    if (state.settings.currentBatchId === undefined) state.settings.currentBatchId = null;
-    if (state.settings.cartHoldHours === undefined) state.settings.cartHoldHours = 24;
-    if (state.settings.password === undefined) state.settings.password = "";
-    if (!Array.isArray(state.settings.shippingMethods)) state.settings.shippingMethods = defaultShippingMethods();
-    arrayFields.forEach(k => { if (!Array.isArray(state[k])) state[k] = []; });
-    ncSave(state);
-    return state;
-  }
-
-  const seed = {
-    settings: {
-      communityName: "好日集 NANACACA",
-      currentBatchId: null,
-      cartHoldHours: 24,
-      password: "", // set on first run via settings page
-      shippingMethods: defaultShippingMethods()
-    },
-    batches: [],       // 期別
-    products: [],       // 商品
-    seriesRules: [],    // 系列組合價
-    customers: [],       // 顧客
-    orders: [],          // 訂單
-    orderItems: [],      // 訂單明細
-    cartHolds: [],       // 購物車暫存(預扣庫存)
-    costs: [],           // 成本
-    remittances: []      // 匯款回報
-  };
-  localStorage.setItem(NC_KEY, JSON.stringify(seed));
-  return seed;
+  state.settings = state.settings || {};
+  if (state.settings.communityName === undefined) state.settings.communityName = "好日集 NANACACA";
+  if (state.settings.currentBatchId === undefined) state.settings.currentBatchId = null;
+  if (state.settings.cartHoldHours === undefined) state.settings.cartHoldHours = 24;
+  if (state.settings.password === undefined) state.settings.password = "";
+  if (!Array.isArray(state.settings.shippingMethods)) state.settings.shippingMethods = defaultShippingMethods();
+  arrayFields.forEach(k => { if (!Array.isArray(state[k])) state[k] = []; });
+  return state;
 }
 
-function ncSave(state) {
+// 本機備份/離線後援：只有在連不到後端時才會用到
+function ncLoad() {
+  const raw = localStorage.getItem(NC_KEY);
+  const state = ncMigrate(raw ? JSON.parse(raw) : {});
   localStorage.setItem(NC_KEY, JSON.stringify(state));
+  return state;
 }
 
 function ncId(prefix) {
@@ -108,9 +83,32 @@ function tieredUnitPrice(basePrice, rules, seriesQty) {
 /* ---------------- DB access object (the swap layer) ---------------- */
 
 const DB = {
-  state: ncLoad(),
+  state: null,
+  ready: null,
 
-  save() { ncSave(this.state); },
+  // 一定要在頁面渲染前呼叫並等待這個，會從後端抓最新資料填進 this.state
+  init() {
+    if (this.ready) return this.ready;
+    this.ready = fetch(NC_GAS_URL + "?action=loadAll")
+      .then(res => res.json())
+      .then(data => {
+        this.state = ncMigrate(data);
+        localStorage.setItem(NC_KEY, JSON.stringify(this.state));
+      })
+      .catch(err => {
+        console.error("無法連線到後端，暫時改用本機備份資料：", err);
+        this.state = ncLoad();
+      });
+    return this.ready;
+  },
+
+  save() {
+    localStorage.setItem(NC_KEY, JSON.stringify(this.state));
+    fetch(NC_GAS_URL, {
+      method: "POST",
+      body: JSON.stringify({ action: "saveAll", payload: this.state })
+    }).catch(err => console.error("同步到後端失敗（已存在本機，之後會再嘗試）：", err));
+  },
 
   // ---- settings ----
   getSettings() { return this.state.settings; },
@@ -300,19 +298,30 @@ const DB = {
   },
 
   // ---- remittance reports (匯款回報, submitted from the public page) ----
-  // --- swap point --- on the real backend this is written by the GAS
-  // doPost() handler, not by the browser directly, to keep write access
-  // off the public page. See Code.gs > submitRemittance().
+  // 注意：正式上線後，顧客端的 remit.html 不會呼叫這個方法，而是直接打
+  // Code.gs 的 submitRemittance 動作（避免公開頁面需要載入整包後台資料）。
+  // 這裡保留是給後台自己需要時用，一樣會同步到後端。
   submitRemittance(r) {
     const record = { id: ncId("RMT"), createdAt: Date.now(), status: "待核對", ...r };
     this.state.remittances.push(record);
     this.save();
+    fetch(NC_GAS_URL, {
+      method: "POST",
+      body: JSON.stringify({ action: "submitRemittance", payload: r })
+    }).catch(err => console.error("回報同步失敗：", err));
     return record;
   },
   listRemittances(orderId) { return this.state.remittances.filter(r => !orderId || r.orderId === orderId); },
   confirmRemittance(id) {
     const r = this.state.remittances.find(x => x.id === id);
-    if (r) { r.status = "已核對"; this.save(); }
+    if (r) {
+      r.status = "已核對";
+      this.save();
+      fetch(NC_GAS_URL, {
+        method: "POST",
+        body: JSON.stringify({ action: "confirmRemittance", payload: { id } })
+      }).catch(err => console.error("同步失敗：", err));
+    }
     return r;
   }
 };
