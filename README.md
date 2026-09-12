@@ -32,7 +32,7 @@
 ## 檔案總覽
 
 - `index.html` / `products.html` / `order.html` / `orders.html` / `costs.html` /
-  `settings.html` — 後台頁面，都需要密碼（在設定頁設定）
+  `reports.html` / `settings.html` — 後台頁面，都需要密碼（在設定頁設定）
 - `remit.html` — 顧客匯款回報頁，無密碼，透過訂單專屬連結開啟
 - `config.js` — 你的 Google Apps Script 部署網址，改後端網址只要改這一行
 - `data.js` — 前端資料層／業務邏輯（成本試算、組合價、購物車、期別等）

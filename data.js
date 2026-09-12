@@ -57,17 +57,19 @@ function ncId(prefix) {
 
 /* ---------------- Business calculations (shared, pure functions) ---------------- */
 
-// 成本(TWD) = 日幣金額 × (1 - 退稅手續費%/100) × (1 + 刷卡手續費%/100) × 匯率 + 運費
-// 重量以「公斤」輸入，可填小數（例如200克 = 0.2），運費 = 重量(公斤) × 0.3
+// 成本(TWD) = [(日幣金額 × (1+刷卡手續費%/100)) － 退稅金額] × 匯率 × (採購方式為「代買10%」則再×1.1) ＋ 運費
+// 重量以「公克」輸入，運費 = 重量(公克) × 0.3
 function calcCostTWD(p) {
   const jpy = Number(p.jpyAmount) || 0;
   const feePct = Number(p.cardFeePct) || 0;
-  const taxRefundPct = Number(p.taxRefundFee) || 0;
+  const taxRefundAmount = Number(p.taxRefundFee) || 0;
   const rate = Number(p.exchangeRate) || 0;
-  const weight = Number(p.weightKg) || 0;
+  const weight = Number(p.weightG) || 0;
   const shippingTWD = weight * 0.3;
-  const netJPY = jpy * (1 - taxRefundPct / 100) * (1 + feePct / 100);
-  const costTWD = netJPY * rate + shippingTWD;
+  const netJPY = jpy * (1 + feePct / 100) - taxRefundAmount;
+  let baseTWD = netJPY * rate;
+  if (p.purchaseType === "代買10%") baseTWD = baseTWD * 1.1; // 日本當地代買，加收10%手續費
+  const costTWD = baseTWD + shippingTWD;
   return { shippingTWD, costTWD: Math.round(costTWD * 100) / 100 };
 }
 
@@ -104,9 +106,15 @@ const DB = {
 
   save() {
     localStorage.setItem(NC_KEY, JSON.stringify(this.state));
+    // 發票照片只留在本機備份，不送到後端（單一儲存格放不下一張照片的
+    // base64 資料，硬塞進去會讓整包同步失敗）。
+    const syncState = { ...this.state, products: this.state.products.map(p => {
+      const { receiptPhoto, ...rest } = p;
+      return rest;
+    }) };
     fetch(NC_GAS_URL, {
       method: "POST",
-      body: JSON.stringify({ action: "saveAll", payload: this.state })
+      body: JSON.stringify({ action: "saveAll", payload: syncState })
     }).catch(err => console.error("同步到後端失敗（已存在本機，之後會再嘗試）：", err));
   },
 
@@ -331,10 +339,37 @@ function batchProfitSummary(batchId) {
   const orders = DB.listOrders(batchId);
   const revenue = orders.reduce((s, o) => s + DB.orderTotal(o.id), 0);
   const products = DB.listProducts(batchId);
-  // 進貨成本＝本期所有商品的成本 × 庫存數量（採購當下就已花費，不論賣出與否）
-  const cogs = products.reduce((s, p) => s + (Number(p.costTWD) || 0) * (Number(p.stockQty) || 0), 0);
+  // 進貨成本＝已經入單賣出的商品成本 × 數量（庫存常設成 9999 方便下單，不能拿來當作採購量）
+  const cogs = products.reduce((s, p) => s + (Number(p.costTWD) || 0) * (Number(p.sold) || 0), 0);
   const cost = DB.costsFor(batchId)[0] || {};
   const tripCosts = ["flight", "hotel", "transport", "freeShippingSubsidy"]
     .reduce((s, k) => s + (Number(cost[k]) || 0), 0);
   return { revenue, cogs, tripCosts, profit: revenue - cogs - tripCosts };
+}
+
+/* ---------------- 顧客累計消費／利潤（跨所有期別） ---------------- */
+function customerSummaries() {
+  return DB.state.customers.map(c => {
+    const orders = DB.state.orders.filter(o => o.customerId === c.id && o.status !== "已取消");
+    let totalSpent = 0, totalProfit = 0;
+    orders.forEach(o => {
+      const total = DB.orderTotal(o.id);
+      totalSpent += total;
+      const itemsCost = DB.orderItemsFor(o.id).reduce((s, i) => {
+        const p = DB.state.products.find(x => x.id === i.productId);
+        return s + (p ? Number(p.costTWD) || 0 : 0) * Number(i.qty);
+      }, 0);
+      totalProfit += total - itemsCost;
+    });
+    return { customer: c, orderCount: orders.length, totalSpent, totalProfit };
+  }).filter(r => r.orderCount > 0).sort((a, b) => b.totalSpent - a.totalSpent);
+}
+
+/* ---------------- 每個期別的損益報表（本期＋過去） ---------------- */
+function allBatchReports() {
+  return DB.listBatches().map(b => ({
+    batch: b,
+    orderCount: DB.listOrders(b.id).length,
+    ...batchProfitSummary(b.id)
+  }));
 }

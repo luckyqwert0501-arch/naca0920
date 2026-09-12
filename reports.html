@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>報表 － 代購管理平台</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<script src="config.js"></script>
+<script src="data.js"></script>
+<script src="nav.js"></script>
+<script>
+ncBoot("reports.html", "報表", (el) => {
+  const customerRows = customerSummaries();
+  const batchRows = allBatchReports();
+
+  el.innerHTML = `
+    <div class="card no-print">
+      <button class="btn btn-ghost btn-small" id="printBtn">列印本頁報表</button>
+    </div>
+
+    <div class="card print-sheet">
+      <h2>顧客累計消費／利潤（所有期別加總）</h2>
+      <div class="grid-wrap">
+        <table class="data-table">
+          <thead><tr><th>姓名</th><th>電話</th><th>累計訂單數</th><th>累計消費</th><th>累計利潤</th></tr></thead>
+          <tbody>
+            ${customerRows.length ? customerRows.map(r => `
+              <tr>
+                <td>${r.customer.name}</td>
+                <td>${r.customer.phone}</td>
+                <td>${r.orderCount}</td>
+                <td>${ncFmt(r.totalSpent)}</td>
+                <td style="color:${r.totalProfit>=0?'var(--matcha)':'var(--danger)'}">${ncFmt(r.totalProfit)}</td>
+              </tr>`).join("") : `<tr><td colspan="5" style="color:var(--ink-soft)">尚無資料</td></tr>`}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card print-sheet">
+      <h2>各期別損益總覽（本期＋過去）</h2>
+      <div class="grid-wrap">
+        <table class="data-table">
+          <thead><tr><th>期別</th><th>狀態</th><th>訂單數</th><th>營收</th><th>進貨成本</th><th>出差成本</th><th>淨利</th></tr></thead>
+          <tbody>
+            ${batchRows.length ? batchRows.map(r => `
+              <tr>
+                <td>${r.batch.name}</td>
+                <td>${r.batch.status||""}</td>
+                <td>${r.orderCount}</td>
+                <td>${ncFmt(r.revenue)}</td>
+                <td>${ncFmt(r.cogs)}</td>
+                <td>${ncFmt(r.tripCosts)}</td>
+                <td style="color:${r.profit>=0?'var(--matcha)':'var(--danger)'}; font-weight:600;">${ncFmt(r.profit)}</td>
+              </tr>`).join("") : `<tr><td colspan="7" style="color:var(--ink-soft)">尚無資料</td></tr>`}
+          </tbody>
+        </table>
+      </div>
+    </div>`;
+
+  document.getElementById("printBtn").addEventListener("click", () => window.print());
+});
+</script>
+</body>
+</html>

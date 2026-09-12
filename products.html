@@ -36,7 +36,7 @@ ncBoot("products.html", "商品輸入", (el) => {
           <table class="grid" id="pTable">
             <thead><tr>
               <th>採購方式</th><th>系列</th><th>商品名稱</th><th>日幣金額</th>
-              <th>刷卡手續費%</th><th>退稅手續費%</th><th>匯率</th><th>重量(公斤)</th>
+              <th>刷卡手續費%</th><th>退稅金額(JPY)</th><th>匯率</th><th>重量(公克)</th>
               <th>運費(自動)</th><th>成本TWD(自動)</th><th>售價</th><th>庫存</th><th>發票</th><th>常態商品</th><th></th>
             </tr></thead>
             <tbody id="pTbody"></tbody>
@@ -91,7 +91,7 @@ ncBoot("products.html", "商品輸入", (el) => {
   function productRow(p) {
     const tr = document.createElement("tr");
     const data = p || { id: null, batchId: batch.id, purchaseType: "親自", series: "", name: "",
-      jpyAmount: "", cardFeePct: "", taxRefundFee: "", exchangeRate: "", weightKg: "", sellPrice: "", stockQty: "", receiptPhoto: "", isStanding: false };
+      jpyAmount: "", cardFeePct: "", taxRefundFee: "", exchangeRate: "", weightG: "", sellPrice: "", stockQty: "", receiptPhoto: "", isStanding: false };
 
     tr.innerHTML = `
       <td data-label="採購方式"><select data-k="purchaseType">
@@ -101,9 +101,9 @@ ncBoot("products.html", "商品輸入", (el) => {
       <td data-label="商品名稱"><input data-k="name" value="${data.name||""}" placeholder="商品名稱"/></td>
       <td data-label="日幣金額"><input data-k="jpyAmount" type="number" value="${data.jpyAmount}" /></td>
       <td data-label="刷卡手續費%"><input data-k="cardFeePct" type="number" value="${data.cardFeePct}" /></td>
-      <td data-label="退稅手續費%"><input data-k="taxRefundFee" type="number" value="${data.taxRefundFee}" /></td>
+      <td data-label="退稅金額(JPY)"><input data-k="taxRefundFee" type="number" value="${data.taxRefundFee}" /></td>
       <td data-label="匯率"><input data-k="exchangeRate" type="number" step="0.01" value="${data.exchangeRate}" /></td>
-      <td data-label="重量(公斤)"><input data-k="weightKg" type="number" step="0.001" placeholder="例：0.2" value="${data.weightKg}" /></td>
+      <td data-label="重量(公克)"><input data-k="weightG" type="number" step="1" placeholder="例：200" value="${data.weightG}" /></td>
       <td data-label="運費(自動)" class="shipVal" style="color:var(--ink-soft)">－</td>
       <td data-label="成本TWD(自動)" class="costVal" style="color:var(--kinari-gold); font-weight:600;">－</td>
       <td data-label="售價"><input data-k="sellPrice" type="number" value="${data.sellPrice}" /></td>
