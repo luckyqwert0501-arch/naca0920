@@ -57,19 +57,18 @@ function ncId(prefix) {
 
 /* ---------------- Business calculations (shared, pure functions) ---------------- */
 
-// 成本(TWD) = [(日幣金額 × (1+刷卡手續費%/100)) － 退稅金額] × 匯率 × (採購方式為「代買10%」則再×1.1) ＋ 運費
-// 重量以「公克」輸入，運費 = 重量(公克) × 0.3
+// 成本(JPY) = 日幣金額 × (1 + 刷卡手續費% + 代買手續費%(採購方式為「代買10%」才有) － 退稅%)
+// 成本(TWD) = 成本(JPY) × 匯率 ＋ 運費(重量公克 × 0.3)
 function calcCostTWD(p) {
   const jpy = Number(p.jpyAmount) || 0;
   const feePct = Number(p.cardFeePct) || 0;
-  const taxRefundAmount = Number(p.taxRefundFee) || 0;
+  const taxRefundPct = Number(p.taxRefundFee) || 0;
+  const agentPct = (p.purchaseType === "代買10%") ? 10 : 0;
   const rate = Number(p.exchangeRate) || 0;
   const weight = Number(p.weightG) || 0;
   const shippingTWD = weight * 0.3;
-  const netJPY = jpy * (1 + feePct / 100) - taxRefundAmount;
-  let baseTWD = netJPY * rate;
-  if (p.purchaseType === "代買10%") baseTWD = baseTWD * 1.1; // 日本當地代買，加收10%手續費
-  const costTWD = baseTWD + shippingTWD;
+  const jpyCost = jpy * (1 + feePct / 100 + agentPct / 100 - taxRefundPct / 100);
+  const costTWD = jpyCost * rate + shippingTWD;
   return { shippingTWD, costTWD: Math.round(costTWD * 100) / 100 };
 }
 
@@ -191,11 +190,26 @@ const DB = {
   findCustomerByPhone(phone) { return this.state.customers.find(c => c.phone === phone); },
   upsertCustomer(c) {
     let existing = c.phone ? this.findCustomerByPhone(c.phone) : null;
-    if (existing) { Object.assign(existing, c); this.save(); return existing; }
+    if (existing) {
+      // 生日只在第一次輸入時設定，之後即使再傳新值也不會覆蓋掉
+      const patch = { ...c };
+      if (existing.birthday) delete patch.birthday;
+      Object.assign(existing, patch);
+      this.save();
+      return existing;
+    }
     const record = { id: ncId("CUS"), ...c };
     this.state.customers.push(record);
     this.save();
     return record;
+  },
+  searchCustomers(query) {
+    const q = (query || "").trim().toLowerCase();
+    if (!q) return [];
+    return this.state.customers.filter(c =>
+      (c.name && c.name.toLowerCase().includes(q)) ||
+      (c.lineName && c.lineName.toLowerCase().includes(q))
+    ).slice(0, 8);
   },
 
   // ---- cart holds (預扣庫存, expire after settings.cartHoldHours) ----
@@ -348,9 +362,9 @@ function batchProfitSummary(batchId) {
 }
 
 /* ---------------- 顧客累計消費／利潤（跨所有期別） ---------------- */
-function customerSummaries() {
+function customerSummaries(batchId) {
   return DB.state.customers.map(c => {
-    const orders = DB.state.orders.filter(o => o.customerId === c.id && o.status !== "已取消");
+    const orders = DB.state.orders.filter(o => o.customerId === c.id && o.status !== "已取消" && (!batchId || o.batchId === batchId));
     let totalSpent = 0, totalProfit = 0;
     orders.forEach(o => {
       const total = DB.orderTotal(o.id);

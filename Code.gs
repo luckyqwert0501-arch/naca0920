@@ -61,7 +61,7 @@ const PRODUCT_FIELDS = [
   { key: "name", header: "商品名稱" },
   { key: "jpyAmount", header: "日幣金額" },
   { key: "cardFeePct", header: "刷卡手續費%" },
-  { key: "taxRefundFee", header: "退稅金額" },
+  { key: "taxRefundFee", header: "退稅%" },
   { key: "exchangeRate", header: "匯率" },
   { key: "weightG", header: "重量(公克)" },
   { key: "shippingTWD", header: "運費(TWD)" },
@@ -89,7 +89,8 @@ const CUSTOMER_FIELDS = [
   { key: "name", header: "姓名" },
   { key: "phone", header: "電話" },
   { key: "lineName", header: "Line名稱" },
-  { key: "address", header: "地址" }
+  { key: "address", header: "地址" },
+  { key: "birthday", header: "生日" }
 ];
 
 // 訂單分頁是攤平存的（收件資訊拆成獨立欄位），讀寫時會跟前端的巢狀

@@ -86,8 +86,7 @@ function ncRenderShell(activeHref, contentHtml) {
 /* Call this at the top of every internal page.
    render(container) receives the #ncContent-equivalent and should build the page. */
 function ncBoot(activeHref, pageTitle, render) {
-  document.body.innerHTML = `<div style="min-height:100vh; display:flex; align-items:center; justify-content:center; color:var(--ink-soft); font-family:var(--font-body,sans-serif);">連線中…</div>`;
-  DB.init().then(() => {
+  function paint() {
     DB.releaseExpiredHolds();
     const start = () => {
       ncRenderShell(activeHref, "");
@@ -96,5 +95,24 @@ function ncBoot(activeHref, pageTitle, render) {
     };
     if (ncRequireUnlock()) start();
     else ncRenderLockScreen(start);
-  });
+  }
+
+  const cached = localStorage.getItem(NC_KEY);
+  if (cached) {
+    // 先用本機上一次的資料立刻畫面，不用每次都等後端回應（後端讀取
+    // Google Sheet 本來就需要幾秒鐘，等待會讓每個頁面都感覺很慢）。
+    try {
+      DB.state = ncMigrate(JSON.parse(cached));
+      paint();
+    } catch (e) { /* 本機資料壞掉就照舊等後端 */ }
+  }
+
+  if (!DB.state) {
+    document.body.innerHTML = `<div style="min-height:100vh; display:flex; align-items:center; justify-content:center; color:var(--ink-soft); font-family:var(--font-body,sans-serif);">連線中…</div>`;
+    DB.init().then(paint);
+  } else {
+    // 已經先畫出本機資料了，背景偷偷跟後端同步最新版本，不會打斷畫面。
+    // 如果你剛好在另一台裝置改過資料，重新整理一次就會抓到最新的。
+    DB.init();
+  }
 }

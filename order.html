@@ -19,7 +19,7 @@ ncBoot("order.html", "顧客入單", (el) => {
   // in-memory cart for this session: [{productId, qty, holdId}]
   let cart = [];
   let step = 1;
-  let customer = { name: "", phone: "", lineName: "" };
+  let customer = { name: "", phone: "", lineName: "", birthday: "" };
 
   function productsCached() { return DB.listProducts(batch.id); }
 
@@ -44,10 +44,19 @@ ncBoot("order.html", "顧客入單", (el) => {
     el.innerHTML = `
       <div class="card">
         <h2>顧客資料</h2>
+        <div class="field">
+          <label>用姓名或Line名稱搜尋（找不到電話時可以用這個）</label>
+          <input id="custSearch" placeholder="輸入姓名或Line名稱關鍵字…" autocomplete="off"/>
+          <div id="custSearchResults"></div>
+        </div>
         <div class="row">
           <div class="field"><label>電話（顧客識別依據）</label><input id="custPhone" value="${customer.phone}"/></div>
           <div class="field"><label>姓名</label><input id="custName" value="${customer.name}"/></div>
           <div class="field"><label>Line名稱</label><input id="custLine" value="${customer.lineName}"/></div>
+          <div class="field">
+            <label>生日${existingCustomer && existingCustomer.birthday ? "（已設定，之後不會再變更）" : "（第一次輸入後就不會再被覆蓋，方便之後提醒送生日禮）"}</label>
+            <input id="custBirthday" value="${existingCustomer && existingCustomer.birthday ? existingCustomer.birthday : customer.birthday}" placeholder="例如 03/15" ${existingCustomer && existingCustomer.birthday ? "disabled" : ""}/>
+          </div>
         </div>
         ${openOrder ? `<p style="color:var(--matcha); font-size:.85rem;">此顧客本期已有訂單，這次加單會併入同一張訂單、不重複收運費。</p>` : ""}
       </div>
@@ -80,11 +89,34 @@ ncBoot("order.html", "顧客入單", (el) => {
     document.getElementById("custPhone").addEventListener("input", e => {
       customer.phone = e.target.value;
       const found = DB.findCustomerByPhone(customer.phone);
-      if (found) { customer.name = found.name; customer.lineName = found.lineName; renderStep1(); }
+      if (found) { customer.name = found.name; customer.lineName = found.lineName; customer.birthday = found.birthday || ""; renderStep1(); }
     });
     document.getElementById("custName").addEventListener("input", e => customer.name = e.target.value);
     document.getElementById("custLine").addEventListener("input", e => customer.lineName = e.target.value);
+    document.getElementById("custBirthday").addEventListener("input", e => customer.birthday = e.target.value);
     document.getElementById("backHomeBtn").addEventListener("click", () => location.href = "index.html");
+
+    const searchInput = document.getElementById("custSearch");
+    const searchResults = document.getElementById("custSearchResults");
+    searchInput.addEventListener("input", () => {
+      const matches = DB.searchCustomers(searchInput.value);
+      searchResults.innerHTML = matches.map(c => `
+        <div class="cart-line" data-pick="${c.id}" style="cursor:pointer;">
+          <span>${c.name}${c.lineName ? "（Line: "+c.lineName+"）" : ""}</span>
+          <span style="color:var(--ink-soft)">${c.phone}</span>
+        </div>`).join("");
+      searchResults.querySelectorAll("[data-pick]").forEach(row => {
+        row.addEventListener("click", () => {
+          const picked = DB.state.customers.find(x => x.id === row.dataset.pick);
+          if (picked) {
+            customer.name = picked.name; customer.phone = picked.phone;
+            customer.lineName = picked.lineName || ""; customer.birthday = picked.birthday || "";
+            searchInput.value = "";
+            renderStep1();
+          }
+        });
+      });
+    });
 
     document.getElementById("addToCartBtn").addEventListener("click", () => {
       const pid = document.getElementById("prodSelect").value;
@@ -174,7 +206,7 @@ ncBoot("order.html", "顧客入單", (el) => {
       const shippingTWD = isReturning ? 0 : Number(document.getElementById("rShipFee").value) || 0;
       const result = DB.submitOrder({
         customer: { name: customer.name, phone: customer.phone, lineName: customer.lineName,
-          address: document.getElementById("rAddr").value },
+          address: document.getElementById("rAddr").value, birthday: customer.birthday || "" },
         batchId: batch.id,
         cartLines,
         holdIds: cart.map(l => l.holdId),

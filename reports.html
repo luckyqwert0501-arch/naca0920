@@ -12,55 +12,76 @@
 <script src="nav.js"></script>
 <script>
 ncBoot("reports.html", "報表", (el) => {
-  const customerRows = customerSummaries();
-  const batchRows = allBatchReports();
+  const settings = DB.getSettings();
+  const currentBatch = DB.listBatches().find(b => b.id === settings.currentBatchId);
+  let scope = "current"; // "current" 當期 | "all" 累積
 
-  el.innerHTML = `
-    <div class="card no-print">
-      <button class="btn btn-ghost btn-small" id="printBtn">列印本頁報表</button>
-    </div>
+  function render() {
+    const batchIdFilter = scope === "current" && currentBatch ? currentBatch.id : null;
+    const customerRows = customerSummaries(batchIdFilter);
+    const batchRows = scope === "current" && currentBatch
+      ? [{ batch: currentBatch, orderCount: DB.listOrders(currentBatch.id).length, ...batchProfitSummary(currentBatch.id) }]
+      : allBatchReports();
 
-    <div class="card print-sheet">
-      <h2>顧客累計消費／利潤（所有期別加總）</h2>
-      <div class="grid-wrap">
-        <table class="data-table">
-          <thead><tr><th>姓名</th><th>電話</th><th>累計訂單數</th><th>累計消費</th><th>累計利潤</th></tr></thead>
-          <tbody>
-            ${customerRows.length ? customerRows.map(r => `
-              <tr>
-                <td>${r.customer.name}</td>
-                <td>${r.customer.phone}</td>
-                <td>${r.orderCount}</td>
-                <td>${ncFmt(r.totalSpent)}</td>
-                <td style="color:${r.totalProfit>=0?'var(--matcha)':'var(--danger)'}">${ncFmt(r.totalProfit)}</td>
-              </tr>`).join("") : `<tr><td colspan="5" style="color:var(--ink-soft)">尚無資料</td></tr>`}
-          </tbody>
-        </table>
+    el.innerHTML = `
+      <div class="card no-print">
+        <div class="row" style="align-items:center;">
+          <div class="field" style="max-width:220px">
+            <label>檢視範圍</label>
+            <select id="scopeSelect">
+              <option value="current" ${scope==="current"?"selected":""}>當期${currentBatch?"（"+currentBatch.name+"）":""}</option>
+              <option value="all" ${scope==="all"?"selected":""}>累積（所有期別）</option>
+            </select>
+          </div>
+          <div class="field" style="justify-content:flex-end"><button class="btn btn-ghost btn-small" id="printBtn">列印本頁報表</button></div>
+        </div>
       </div>
-    </div>
 
-    <div class="card print-sheet">
-      <h2>各期別損益總覽（本期＋過去）</h2>
-      <div class="grid-wrap">
-        <table class="data-table">
-          <thead><tr><th>期別</th><th>狀態</th><th>訂單數</th><th>營收</th><th>進貨成本</th><th>出差成本</th><th>淨利</th></tr></thead>
-          <tbody>
-            ${batchRows.length ? batchRows.map(r => `
-              <tr>
-                <td>${r.batch.name}</td>
-                <td>${r.batch.status||""}</td>
-                <td>${r.orderCount}</td>
-                <td>${ncFmt(r.revenue)}</td>
-                <td>${ncFmt(r.cogs)}</td>
-                <td>${ncFmt(r.tripCosts)}</td>
-                <td style="color:${r.profit>=0?'var(--matcha)':'var(--danger)'}; font-weight:600;">${ncFmt(r.profit)}</td>
-              </tr>`).join("") : `<tr><td colspan="7" style="color:var(--ink-soft)">尚無資料</td></tr>`}
-          </tbody>
-        </table>
+      <div class="card print-sheet">
+        <h2>顧客消費／利潤${scope==="current"?"（當期）":"（所有期別加總）"}</h2>
+        <div class="grid-wrap">
+          <table class="data-table">
+            <thead><tr><th>姓名</th><th>電話</th><th>訂單數</th><th>消費總額</th><th>利潤</th></tr></thead>
+            <tbody>
+              ${customerRows.length ? customerRows.map(r => `
+                <tr>
+                  <td>${r.customer.name}</td>
+                  <td>${r.customer.phone}</td>
+                  <td>${r.orderCount}</td>
+                  <td>${ncFmt(r.totalSpent)}</td>
+                  <td style="color:${r.totalProfit>=0?'var(--matcha)':'var(--danger)'}">${ncFmt(r.totalProfit)}</td>
+                </tr>`).join("") : `<tr><td colspan="5" style="color:var(--ink-soft)">尚無資料</td></tr>`}
+            </tbody>
+          </table>
+        </div>
       </div>
-    </div>`;
 
-  document.getElementById("printBtn").addEventListener("click", () => window.print());
+      <div class="card print-sheet">
+        <h2>期別損益總覽${scope==="current"?"（當期）":"（本期＋過去）"}</h2>
+        <div class="grid-wrap">
+          <table class="data-table">
+            <thead><tr><th>期別</th><th>狀態</th><th>訂單數</th><th>營收</th><th>進貨成本</th><th>出差成本</th><th>淨利</th></tr></thead>
+            <tbody>
+              ${batchRows.length ? batchRows.map(r => `
+                <tr>
+                  <td>${r.batch.name}</td>
+                  <td>${r.batch.status||""}</td>
+                  <td>${r.orderCount}</td>
+                  <td>${ncFmt(r.revenue)}</td>
+                  <td>${ncFmt(r.cogs)}</td>
+                  <td>${ncFmt(r.tripCosts)}</td>
+                  <td style="color:${r.profit>=0?'var(--matcha)':'var(--danger)'}; font-weight:600;">${ncFmt(r.profit)}</td>
+                </tr>`).join("") : `<tr><td colspan="7" style="color:var(--ink-soft)">尚無資料</td></tr>`}
+            </tbody>
+          </table>
+        </div>
+      </div>`;
+
+    document.getElementById("scopeSelect").addEventListener("change", e => { scope = e.target.value; render(); });
+    document.getElementById("printBtn").addEventListener("click", () => window.print());
+  }
+
+  render();
 });
 </script>
 </body>
