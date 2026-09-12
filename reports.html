@@ -5,6 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>報表 － 代購管理平台</title>
 <link rel="stylesheet" href="style.css" />
+<style>
+  th.sortable{ cursor:pointer; user-select:none; }
+  th.sortable:hover{ color:var(--aizome); }
+  th.sortable .arrow{ opacity:.5; font-size:.7em; margin-left:3px; }
+</style>
 </head>
 <body>
 <script src="config.js"></script>
@@ -15,13 +20,65 @@ ncBoot("reports.html", "報表", (el) => {
   const settings = DB.getSettings();
   const currentBatch = DB.listBatches().find(b => b.id === settings.currentBatchId);
   let scope = "current"; // "current" 當期 | "all" 累積
+  let custSort = { key: "totalSpent", dir: "desc" };
+  let batchSort = { key: "profit", dir: "desc" };
+
+  const CUST_COLS = [
+    { key: "name", label: "姓名" },
+    { key: "phone", label: "電話" },
+    { key: "orderCount", label: "訂單數" },
+    { key: "totalSpent", label: "消費總額" },
+    { key: "totalProfit", label: "利潤" }
+  ];
+  const CUST_GETTERS = {
+    name: r => r.customer.name || "", phone: r => r.customer.phone || "",
+    orderCount: r => r.orderCount, totalSpent: r => r.totalSpent, totalProfit: r => r.totalProfit
+  };
+  const BATCH_COLS = [
+    { key: "name", label: "期別" }, { key: "status", label: "狀態" },
+    { key: "orderCount", label: "訂單數" }, { key: "revenue", label: "營收" },
+    { key: "cogs", label: "進貨成本" }, { key: "tripCosts", label: "出差成本" }, { key: "profit", label: "淨利" }
+  ];
+  const BATCH_GETTERS = {
+    name: r => r.batch.name || "", status: r => r.batch.status || "",
+    orderCount: r => r.orderCount, revenue: r => r.revenue, cogs: r => r.cogs,
+    tripCosts: r => r.tripCosts, profit: r => r.profit
+  };
+
+  function sortRows(rows, sort, getters) {
+    const arr = rows.slice();
+    const get = getters[sort.key];
+    arr.sort((a, b) => {
+      const va = get(a), vb = get(b);
+      let cmp;
+      if (typeof va === "string") cmp = va.localeCompare(vb, "zh-Hant");
+      else cmp = va - vb;
+      return sort.dir === "asc" ? cmp : -cmp;
+    });
+    return arr;
+  }
+
+  function headerRow(cols, sort) {
+    return cols.map(c => `<th class="sortable" data-key="${c.key}">${c.label}${sort.key===c.key?`<span class="arrow">${sort.dir==="asc"?"▲":"▼"}</span>`:""}</th>`).join("");
+  }
+
+  function wireSort(theadEl, sortState, onChange) {
+    theadEl.querySelectorAll("th.sortable").forEach(th => {
+      th.addEventListener("click", () => {
+        if (sortState.key === th.dataset.key) sortState.dir = sortState.dir === "asc" ? "desc" : "asc";
+        else { sortState.key = th.dataset.key; sortState.dir = "desc"; }
+        onChange();
+      });
+    });
+  }
 
   function render() {
     const batchIdFilter = scope === "current" && currentBatch ? currentBatch.id : null;
-    const customerRows = customerSummaries(batchIdFilter);
-    const batchRows = scope === "current" && currentBatch
+    const customerRows = sortRows(customerSummaries(batchIdFilter), custSort, CUST_GETTERS);
+    const batchRowsRaw = scope === "current" && currentBatch
       ? [{ batch: currentBatch, orderCount: DB.listOrders(currentBatch.id).length, ...batchProfitSummary(currentBatch.id) }]
       : allBatchReports();
+    const batchRows = sortRows(batchRowsRaw, batchSort, BATCH_GETTERS);
 
     el.innerHTML = `
       <div class="card no-print">
@@ -39,9 +96,10 @@ ncBoot("reports.html", "報表", (el) => {
 
       <div class="card print-sheet">
         <h2>顧客消費／利潤${scope==="current"?"（當期）":"（所有期別加總）"}</h2>
+        <p class="hint">點欄位標題可以排序。</p>
         <div class="grid-wrap">
           <table class="data-table">
-            <thead><tr><th>姓名</th><th>電話</th><th>訂單數</th><th>消費總額</th><th>利潤</th></tr></thead>
+            <thead><tr id="custHead">${headerRow(CUST_COLS, custSort)}</tr></thead>
             <tbody>
               ${customerRows.length ? customerRows.map(r => `
                 <tr>
@@ -58,9 +116,10 @@ ncBoot("reports.html", "報表", (el) => {
 
       <div class="card print-sheet">
         <h2>期別損益總覽${scope==="current"?"（當期）":"（本期＋過去）"}</h2>
+        <p class="hint">點欄位標題可以排序。</p>
         <div class="grid-wrap">
           <table class="data-table">
-            <thead><tr><th>期別</th><th>狀態</th><th>訂單數</th><th>營收</th><th>進貨成本</th><th>出差成本</th><th>淨利</th></tr></thead>
+            <thead><tr id="batchHead">${headerRow(BATCH_COLS, batchSort)}</tr></thead>
             <tbody>
               ${batchRows.length ? batchRows.map(r => `
                 <tr>
@@ -79,6 +138,8 @@ ncBoot("reports.html", "報表", (el) => {
 
     document.getElementById("scopeSelect").addEventListener("change", e => { scope = e.target.value; render(); });
     document.getElementById("printBtn").addEventListener("click", () => window.print());
+    wireSort(document.getElementById("custHead"), custSort, render);
+    wireSort(document.getElementById("batchHead"), batchSort, render);
   }
 
   render();

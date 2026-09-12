@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>總覽 － 代購管理平台</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<script src="config.js"></script>
+<script src="data.js"></script>
+<script src="nav.js"></script>
+<script>
+ncBoot("dashboard.html", "總覽", (el) => {
+  const settings = DB.getSettings();
+  let batch = DB.listBatches().find(b => b.id === settings.currentBatchId);
+
+  if (!batch) {
+    el.innerHTML = `
+      <div class="card">
+        <h2>先建立第一個期別</h2>
+        <p style="color:var(--ink-soft)">期別用來把同一趟代購的商品、訂單、匯款設定綁在一起。</p>
+        <div class="row">
+          <div class="field" style="flex:2"><label>期別名稱（例如「2026/09 東京」）</label><input id="batchName"/></div>
+        </div>
+        <button class="btn btn-primary" id="createBatchBtn">建立期別</button>
+      </div>`;
+    document.getElementById("createBatchBtn").addEventListener("click", () => {
+      const name = document.getElementById("batchName").value.trim();
+      if (!name) return;
+      DB.createBatch({ name, bankCode: "", bankAccount: "", bankHolder: "" });
+      location.reload();
+    });
+    return;
+  }
+
+  const orders = DB.listOrders(batch.id);
+  const pendingReview = DB.listRemittances().filter(r => r.status === "待核對");
+  const products = DB.listProducts(batch.id);
+  const lowStock = products.filter(p => DB.availableStock(p) <= 1 && DB.availableStock(p) >= 0);
+  const summary = batchProfitSummary(batch.id);
+
+  el.innerHTML = `
+    <div class="row">
+      <div class="card" style="flex:1; min-width:180px;">
+        <h3>本期訂單</h3>
+        <h2>${orders.length} 筆</h2>
+      </div>
+      <div class="card" style="flex:1; min-width:180px;">
+        <h3>本期營收</h3>
+        <h2 style="color:var(--kinari-gold)">${ncFmt(summary.revenue)}</h2>
+      </div>
+      <div class="card" style="flex:1; min-width:180px;">
+        <h3>待核對匯款</h3>
+        <h2 style="color:var(--sakura)">${pendingReview.length} 筆</h2>
+      </div>
+    </div>
+
+    ${lowStock.length ? `
+    <div class="card">
+      <h2>庫存所剩不多</h2>
+      ${lowStock.map(p => `<div class="cart-line"><span>${p.name}</span><span>剩 ${DB.availableStock(p)}</span></div>`).join("")}
+    </div>` : ""}
+
+    <div class="card">
+      <h2>快速前往</h2>
+      <div class="quick-links">
+        <a href="products.html"><span class="qtitle">＋ 輸入商品</span><span class="qdesc">快速登錄本次採買的商品與成本</span></a>
+        <a href="order.html"><span class="qtitle">＋ 幫顧客建單</span><span class="qdesc">選商品、算金額、送出訂單</span></a>
+        <a href="orders.html"><span class="qtitle">查看訂單</span><span class="qdesc">複製匯款通知、列印出貨單</span></a>
+        <a href="costs.html"><span class="qtitle">成本利潤</span><span class="qdesc">出差成本與本期損益總覽</span></a>
+      </div>
+    </div>`;
+});
+</script>
+</body>
+</html>

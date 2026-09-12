@@ -38,7 +38,7 @@ function ncRenderLockScreen(onUnlock) {
 }
 
 const NC_NAV_ITEMS = [
-  { href: "index.html", label: "總覽" },
+  { href: "dashboard.html", label: "總覽" },
   { href: "products.html", label: "商品輸入" },
   { href: "order.html", label: "顧客入單" },
   { href: "orders.html", label: "訂單" },
