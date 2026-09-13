@@ -9,6 +9,7 @@
   th.sortable{ cursor:pointer; user-select:none; }
   th.sortable:hover{ color:var(--aizome); }
   th.sortable .arrow{ opacity:.5; font-size:.7em; margin-left:3px; }
+  @media print{ .print-only{ display:block !important; } #custWrap, #batchWrap{ display:block !important; } }
 </style>
 </head>
 <body>
@@ -22,6 +23,8 @@ ncBoot("reports.html", "報表", (el) => {
   let scope = "current"; // "current" 當期 | "all" 累積
   let custSort = { key: "totalSpent", dir: "desc" };
   let batchSort = { key: "profit", dir: "desc" };
+  let custExpanded = true;
+  let batchExpanded = true;
 
   const CUST_COLS = [
     { key: "name", label: "姓名" },
@@ -95,44 +98,56 @@ ncBoot("reports.html", "報表", (el) => {
       </div>
 
       <div class="card print-sheet">
-        <h2>顧客消費／利潤${scope==="current"?"（當期）":"（所有期別加總）"}</h2>
-        <p class="hint">點欄位標題可以排序。</p>
-        <div class="grid-wrap">
-          <table class="data-table">
-            <thead><tr id="custHead">${headerRow(CUST_COLS, custSort)}</tr></thead>
-            <tbody>
-              ${customerRows.length ? customerRows.map(r => `
-                <tr>
-                  <td>${r.customer.name}</td>
-                  <td>${r.customer.phone}</td>
-                  <td>${r.orderCount}</td>
-                  <td>${ncFmt(r.totalSpent)}</td>
-                  <td style="color:${r.totalProfit>=0?'var(--matcha)':'var(--danger)'}">${ncFmt(r.totalProfit)}</td>
-                </tr>`).join("") : `<tr><td colspan="5" style="color:var(--ink-soft)">尚無資料</td></tr>`}
-            </tbody>
-          </table>
+        <div class="row no-print" style="align-items:center; justify-content:space-between;">
+          <h2 style="margin:0;">顧客消費／利潤${scope==="current"?"（當期）":"（所有期別加總）"}</h2>
+          <button class="btn btn-ghost btn-small" id="custToggleBtn">${custExpanded ? "收合 ▲" : "展開 ▼"}</button>
+        </div>
+        <h2 class="print-only" style="display:none;">顧客消費／利潤${scope==="current"?"（當期）":"（所有期別加總）"}</h2>
+        <div id="custWrap" style="${custExpanded ? "" : "display:none;"}">
+          <p class="hint">點欄位標題可以排序。</p>
+          <div class="grid-wrap">
+            <table class="data-table">
+              <thead><tr id="custHead">${headerRow(CUST_COLS, custSort)}</tr></thead>
+              <tbody>
+                ${customerRows.length ? customerRows.map(r => `
+                  <tr>
+                    <td>${r.customer.name}</td>
+                    <td>${r.customer.phone}</td>
+                    <td>${r.orderCount}</td>
+                    <td>${ncFmt(r.totalSpent)}</td>
+                    <td style="color:${r.totalProfit>=0?'var(--matcha)':'var(--danger)'}">${ncFmt(r.totalProfit)}</td>
+                  </tr>`).join("") : `<tr><td colspan="5" style="color:var(--ink-soft)">尚無資料</td></tr>`}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
 
       <div class="card print-sheet">
-        <h2>期別損益總覽${scope==="current"?"（當期）":"（本期＋過去）"}</h2>
-        <p class="hint">點欄位標題可以排序。</p>
-        <div class="grid-wrap">
-          <table class="data-table">
-            <thead><tr id="batchHead">${headerRow(BATCH_COLS, batchSort)}</tr></thead>
-            <tbody>
-              ${batchRows.length ? batchRows.map(r => `
-                <tr>
-                  <td>${r.batch.name}</td>
-                  <td>${r.batch.status||""}</td>
-                  <td>${r.orderCount}</td>
-                  <td>${ncFmt(r.revenue)}</td>
-                  <td>${ncFmt(r.cogs)}</td>
-                  <td>${ncFmt(r.tripCosts)}</td>
-                  <td style="color:${r.profit>=0?'var(--matcha)':'var(--danger)'}; font-weight:600;">${ncFmt(r.profit)}</td>
-                </tr>`).join("") : `<tr><td colspan="7" style="color:var(--ink-soft)">尚無資料</td></tr>`}
-            </tbody>
-          </table>
+        <div class="row no-print" style="align-items:center; justify-content:space-between;">
+          <h2 style="margin:0;">期別損益總覽${scope==="current"?"（當期）":"（本期＋過去）"}</h2>
+          <button class="btn btn-ghost btn-small" id="batchToggleBtn">${batchExpanded ? "收合 ▲" : "展開 ▼"}</button>
+        </div>
+        <h2 class="print-only" style="display:none;">期別損益總覽${scope==="current"?"（當期）":"（本期＋過去）"}</h2>
+        <div id="batchWrap" style="${batchExpanded ? "" : "display:none;"}">
+          <p class="hint">點欄位標題可以排序。</p>
+          <div class="grid-wrap">
+            <table class="data-table">
+              <thead><tr id="batchHead">${headerRow(BATCH_COLS, batchSort)}</tr></thead>
+              <tbody>
+                ${batchRows.length ? batchRows.map(r => `
+                  <tr>
+                    <td>${r.batch.name}</td>
+                    <td>${r.batch.status||""}</td>
+                    <td>${r.orderCount}</td>
+                    <td>${ncFmt(r.revenue)}</td>
+                    <td>${ncFmt(r.cogs)}</td>
+                    <td>${ncFmt(r.tripCosts)}</td>
+                    <td style="color:${r.profit>=0?'var(--matcha)':'var(--danger)'}; font-weight:600;">${ncFmt(r.profit)}</td>
+                  </tr>`).join("") : `<tr><td colspan="7" style="color:var(--ink-soft)">尚無資料</td></tr>`}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>`;
 
@@ -140,6 +155,16 @@ ncBoot("reports.html", "報表", (el) => {
     document.getElementById("printBtn").addEventListener("click", () => window.print());
     wireSort(document.getElementById("custHead"), custSort, render);
     wireSort(document.getElementById("batchHead"), batchSort, render);
+    document.getElementById("custToggleBtn").addEventListener("click", () => {
+      custExpanded = !custExpanded;
+      document.getElementById("custWrap").style.display = custExpanded ? "" : "none";
+      document.getElementById("custToggleBtn").textContent = custExpanded ? "收合 ▲" : "展開 ▼";
+    });
+    document.getElementById("batchToggleBtn").addEventListener("click", () => {
+      batchExpanded = !batchExpanded;
+      document.getElementById("batchWrap").style.display = batchExpanded ? "" : "none";
+      document.getElementById("batchToggleBtn").textContent = batchExpanded ? "收合 ▲" : "展開 ▼";
+    });
   }
 
   render();
