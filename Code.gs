@@ -196,6 +196,24 @@ function jsonOut_(obj) {
   return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON);
 }
 
+/* ---------------- 快速讀取用的整包快取 ----------------
+   每次 saveAll／匯款回報動作之後，都會把「當下完整的一份資料」存成一份
+   JSON 塞進 Cache 分頁的 A1 儲存格。之後 loadAll 只需要讀這一格就好，
+   不用一次讀 9 個分頁，頁面切換會快很多。分頁本身還是各自獨立、可以直接
+   打開來看──快取只是額外多存一份「方便快速讀取」的副本，不是取代分頁。 */
+
+function readCache_() {
+  const sheet = ensureSheet_("Cache", ["json"]);
+  const raw = sheet.getRange(2, 1).getValue();
+  if (!raw) return null;
+  try { return JSON.parse(raw); } catch (e) { return null; }
+}
+
+function writeCache_(state) {
+  const sheet = ensureSheet_("Cache", ["json"]);
+  sheet.getRange(2, 1).setValue(JSON.stringify(state));
+}
+
 /* ---------------- 設定（key/value 分頁）＋寄送方式（自己的分頁） ---------------- */
 
 function defaultShippingMethods_() {
@@ -284,18 +302,23 @@ function doGet(e) {
     const action = e.parameter.action;
 
     if (action === "loadAll") {
-      return jsonOut_(loadAllState_());
+      const cached = readCache_();
+      if (cached) return jsonOut_(cached);
+      // 快取是空的（例如第一次使用）：從各分頁組出完整資料，同時順便把快取建起來
+      const fresh = loadAllState_();
+      writeCache_(fresh);
+      return jsonOut_(fresh);
     }
 
     if (action === "orderSummary") {
-      const orders = readOrders_();
-      const order = orders.find(o => o.id === e.parameter.id);
+      const cached = readCache_();
+      const state = cached || loadAllState_();
+      const order = state.orders.find(o => o.id === e.parameter.id);
       if (!order) return jsonOut_({ exists: false });
-      const items = readEntities_("訂單明細", ORDER_ITEM_FIELDS).filter(i => i.orderId === order.id);
+      const items = state.orderItems.filter(i => i.orderId === order.id);
       const itemsTotal = items.reduce((s, i) => s + (Number(i.subtotal) || 0), 0);
       const total = itemsTotal + (Number(order.shippingFee) || 0);
-      const settings = readSettings_();
-      return jsonOut_({ exists: true, id: order.id, total: total, communityName: settings.communityName });
+      return jsonOut_({ exists: true, id: order.id, total: total, communityName: state.settings.communityName });
     }
 
     return jsonOut_({ error: "unknown action" });
@@ -321,6 +344,15 @@ function doPost(e) {
       writeEntities_("購物車暫存", CART_HOLD_FIELDS, payload.cartHolds);
       writeEntities_("成本", COST_FIELDS, payload.costs);
       // 注意：這裡刻意不去動「匯款回報」分頁，交給下面兩個專屬動作處理。
+      // 快取要重新整個組一次（不能直接拿 payload 存，因為 payload 裡的
+      // remittances 可能是舊的——一定要用「匯款回報」分頁目前實際的內容）。
+      const fresh = {
+        settings: payload.settings, batches: payload.batches, products: payload.products,
+        seriesRules: payload.seriesRules, customers: payload.customers, orders: payload.orders,
+        orderItems: payload.orderItems, cartHolds: payload.cartHolds, costs: payload.costs,
+        remittances: readEntities_("匯款回報", REMITTANCE_FIELDS)
+      };
+      writeCache_(fresh);
       return jsonOut_({ ok: true });
     }
 
@@ -332,6 +364,8 @@ function doPost(e) {
       );
       list.push(record);
       writeEntities_("匯款回報", REMITTANCE_FIELDS, list);
+      const cached = readCache_();
+      if (cached) { cached.remittances = list; writeCache_(cached); }
       try {
         MailApp.sendEmail({
           to: Session.getActiveUser().getEmail(),
@@ -353,6 +387,8 @@ function doPost(e) {
       if (r) {
         r.status = "已核對";
         writeEntities_("匯款回報", REMITTANCE_FIELDS, list);
+        const cached = readCache_();
+        if (cached) { cached.remittances = list; writeCache_(cached); }
       }
       return jsonOut_({ ok: true });
     }

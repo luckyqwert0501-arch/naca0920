@@ -16,13 +16,18 @@ ncBoot("products.html", "商品輸入", (el) => {
   const batch = DB.listBatches().find(b => b.id === settings.currentBatchId);
   if (!batch) { el.innerHTML = `<div class="card">請先到「總覽」建立期別。</div>`; return; }
 
+  let invExpanded = true;
+
   function renderTable() {
     const products = DB.listProducts(batch.id);
     el.innerHTML = `
       <div class="card">
-        <h2>庫存總覽</h2>
-        <div class="grid-wrap">
-          <table class="grid">
+        <div class="row" style="align-items:center; justify-content:space-between;">
+          <h2 style="margin:0;">庫存總覽</h2>
+          <button class="btn btn-ghost btn-small" id="invToggleBtn">${invExpanded ? "收合 ▲" : "展開 ▼"}</button>
+        </div>
+        <div class="grid-wrap" id="invWrap" style="${invExpanded ? "" : "display:none;"} margin-top:10px;">
+          <table class="grid" id="invTable">
             <thead><tr><th>商品名稱</th><th>成本</th><th>售價</th><th>利潤</th><th>可售庫存</th></tr></thead>
             <tbody id="invTbody"></tbody>
           </table>
@@ -64,6 +69,12 @@ ncBoot("products.html", "商品輸入", (el) => {
     const rtbody = document.getElementById("rTbody");
     DB.state.seriesRules.filter(r => r.batchId === batch.id).forEach(r => rtbody.appendChild(ruleRow(r)));
     document.getElementById("addRuleBtn").addEventListener("click", () => rtbody.appendChild(ruleRow(null)));
+
+    document.getElementById("invToggleBtn").addEventListener("click", () => {
+      invExpanded = !invExpanded;
+      document.getElementById("invWrap").style.display = invExpanded ? "" : "none";
+      document.getElementById("invToggleBtn").textContent = invExpanded ? "收合 ▲" : "展開 ▼";
+    });
 
     renderInventory();
   }

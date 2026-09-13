@@ -111,10 +111,10 @@ const DB = {
       const { receiptPhoto, ...rest } = p;
       return rest;
     }) };
-    fetch(NC_GAS_URL, {
+    return fetch(NC_GAS_URL, {
       method: "POST",
       body: JSON.stringify({ action: "saveAll", payload: syncState })
-    }).catch(err => console.error("同步到後端失敗（已存在本機，之後會再嘗試）：", err));
+    }).catch(err => { console.error("同步到後端失敗（已存在本機，之後會再嘗試）：", err); });
   },
 
   // 跟 init() 不同：一定會真的重新跟後端要一次最新資料（init() 只抓第一次，
@@ -224,6 +224,17 @@ const DB = {
       (c.lineName && c.lineName.toLowerCase().includes(q))
     ).slice(0, 8);
   },
+  // 用來在訂單頁面補齊/修正顧客資料（例如當初急件沒填電話、生日）。
+  // 電話/Line名稱/地址可以自由修改；生日一旦已經有值就不會被這裡覆蓋。
+  updateCustomerFields(id, patch) {
+    const c = this.state.customers.find(x => x.id === id);
+    if (!c) return null;
+    const safePatch = { ...patch };
+    if (c.birthday) delete safePatch.birthday;
+    Object.assign(c, safePatch);
+    this.save();
+    return c;
+  },
 
   // ---- cart holds (預扣庫存, expire after settings.cartHoldHours) ----
   releaseExpiredHolds() {
@@ -305,8 +316,8 @@ const DB = {
       }
     });
 
-    this.save();
-    return { order, isFirstForCustomer };
+    const saved = this.save();
+    return { order, isFirstForCustomer, saved };
   },
 
   updateOrderStatus(orderId, status) {

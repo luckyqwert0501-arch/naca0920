@@ -50,11 +50,11 @@ ncBoot("order.html", "顧客入單", (el) => {
           <div id="custSearchResults"></div>
         </div>
         <div class="row">
-          <div class="field"><label>電話（顧客識別依據）</label><input id="custPhone" value="${customer.phone}"/></div>
+          <div class="field"><label>電話（顧客識別依據，急件可先空著，之後再補）</label><input id="custPhone" value="${customer.phone}"/></div>
           <div class="field"><label>姓名</label><input id="custName" value="${customer.name}"/></div>
           <div class="field"><label>Line名稱</label><input id="custLine" value="${customer.lineName}"/></div>
           <div class="field">
-            <label>生日${existingCustomer && existingCustomer.birthday ? "（已設定，之後不會再變更）" : "（第一次輸入後就不會再被覆蓋，方便之後提醒送生日禮）"}</label>
+            <label>生日${existingCustomer && existingCustomer.birthday ? "（已設定）" : ""}</label>
             <input id="custBirthday" value="${existingCustomer && existingCustomer.birthday ? existingCustomer.birthday : customer.birthday}" placeholder="例如 03/15" ${existingCustomer && existingCustomer.birthday ? "disabled" : ""}/>
           </div>
         </div>
@@ -131,7 +131,7 @@ ncBoot("order.html", "顧客入單", (el) => {
     });
 
     document.getElementById("nextStepBtn").addEventListener("click", () => {
-      if (!customer.phone || !customer.name) { alert("請填寫顧客姓名與電話"); return; }
+      if (!customer.name) { alert("請至少填寫顧客姓名"); return; }
       if (!cart.length) { alert("購物車是空的"); return; }
       step = 2;
       renderStep2();
@@ -198,6 +198,8 @@ ncBoot("order.html", "顧客入單", (el) => {
       });
     }
     document.getElementById("submitBtn").addEventListener("click", () => {
+      const btn = document.getElementById("submitBtn");
+      btn.disabled = true; btn.textContent = "送出中…";
       const products = productsCached();
       const cartLines = cart.map(l => {
         const p = products.find(x => x.id === l.productId);
@@ -218,7 +220,11 @@ ncBoot("order.html", "顧客入單", (el) => {
           shipMethod: document.getElementById("rShip").selectedOptions[0].textContent
         }
       });
-      location.href = "orders.html?order=" + result.order.id;
+      // 一定要等後端真的存好，再跳去訂單頁——訂單頁會重新跟後端要最新資料，
+      // 如果太早跳頁，可能會因為後端還沒寫完而看起來像「訂單不見了」。
+      Promise.resolve(result.saved).then(() => {
+        location.href = "orders.html?order=" + result.order.id;
+      });
     });
   }
 

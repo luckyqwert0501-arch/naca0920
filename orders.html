@@ -132,6 +132,20 @@ ncBoot("orders.html", "訂單", (el) => {
       </div>
 
       <div class="card no-print">
+        <h2>顧客資料（急件當初沒填的可以在這裡補上）</h2>
+        <div class="row">
+          <div class="field"><label>姓名</label><input id="custEditName" value="${customer.name||""}"/></div>
+          <div class="field"><label>電話</label><input id="custEditPhone" value="${customer.phone||""}"/></div>
+          <div class="field"><label>Line名稱</label><input id="custEditLine" value="${customer.lineName||""}"/></div>
+          <div class="field">
+            <label>生日${customer.birthday ? "（已設定，不會再變更）" : ""}</label>
+            <input id="custEditBirthday" value="${customer.birthday||""}" placeholder="例如 03/15" ${customer.birthday?"disabled":""}/>
+          </div>
+        </div>
+        <button class="btn btn-ghost btn-small" id="custEditSaveBtn">儲存顧客資料</button>
+      </div>
+
+      <div class="card no-print">
         <h2>匯款回報記錄 <button class="btn btn-ghost btn-small" id="refreshRemitBtn" style="margin-left:8px;">重新整理</button></h2>
         ${remits.length ? remits.map(r => `
           <div class="cart-line">
@@ -155,6 +169,15 @@ ncBoot("orders.html", "訂單", (el) => {
 
     document.getElementById("toListBtn").addEventListener("click", renderList);
     document.getElementById("statusSelect").addEventListener("change", e => DB.updateOrderStatus(order.id, e.target.value));
+    document.getElementById("custEditSaveBtn").addEventListener("click", () => {
+      DB.updateCustomerFields(customer.id, {
+        name: document.getElementById("custEditName").value,
+        phone: document.getElementById("custEditPhone").value,
+        lineName: document.getElementById("custEditLine").value,
+        birthday: document.getElementById("custEditBirthday").value
+      });
+      renderDetail(orderId);
+    });
     el.querySelectorAll(".confirmBtn").forEach(b => b.addEventListener("click", () => { DB.confirmRemittance(b.dataset.id); renderDetail(orderId); }));
     document.getElementById("msgBox").value = remittanceMessage(order, customer, items);
     document.getElementById("copyBtn").addEventListener("click", () => {

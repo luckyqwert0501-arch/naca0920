@@ -160,6 +160,27 @@ table.grid tbody tr:hover{ background:#FBF8F1; }
   table.grid td[data-label=""] button{ width:100%; }
 }
 
+/* ---------- Frozen header row + first column(s) for the products page tables ---------- */
+#pTable thead th, #rTable thead th, #invTable thead th{
+  position: sticky; top: 0; z-index: 3; background: var(--paper-raised); box-shadow: 0 1px 0 var(--line);
+}
+#pTable th:nth-child(1), #pTable td:nth-child(1){ position: sticky; left: 0; z-index: 2; background: var(--paper-raised); min-width: 100px; }
+#pTable th:nth-child(2), #pTable td:nth-child(2){ position: sticky; left: 100px; z-index: 2; background: var(--paper-raised); min-width: 150px; box-shadow: 2px 0 0 var(--line); }
+#pTable thead th:nth-child(1), #pTable thead th:nth-child(2){ z-index: 4; }
+
+#rTable th:nth-child(1), #rTable td:nth-child(1){ position: sticky; left: 0; z-index: 2; background: var(--paper-raised); min-width: 130px; box-shadow: 2px 0 0 var(--line); }
+#rTable thead th:nth-child(1){ z-index: 4; }
+
+#invTable th:nth-child(1), #invTable td:nth-child(1){ position: sticky; left: 0; z-index: 2; background: var(--paper-raised); min-width: 160px; box-shadow: 2px 0 0 var(--line); }
+#invTable thead th:nth-child(1){ z-index: 4; }
+
+/* 手機版改成卡片式排列時，凍結欄位沒有意義，取消 sticky 避免版面錯亂 */
+@media (max-width: 760px){
+  #pTable th, #pTable td, #rTable th, #rTable td, #invTable th, #invTable td{
+    position: static !important; box-shadow: none !important; min-width: 0 !important;
+  }
+}
+
 /* ---------- Plain read-only tables (always stays a real table, e.g. A4 slip) ---------- */
 table.data-table{ width:100%; border-collapse:collapse; font-size:.92rem; }
 table.data-table th{ text-align:left; font-weight:600; color:var(--ink-soft); font-size:.78rem; padding:9px 8px; border-bottom:2px solid var(--line); }
