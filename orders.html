@@ -125,6 +125,52 @@ ncBoot("orders.html", "訂單", (el) => {
       </div>
 
       <div class="card no-print">
+        <div class="row" style="align-items:center; justify-content:space-between;">
+          <h2 style="margin:0;">編輯訂單內容</h2>
+          <button class="btn btn-danger btn-small" id="deleteOrderBtn">刪除整張訂單</button>
+        </div>
+        <p class="hint">改數量、移除或新增商品後，記得按下面的「儲存訂單修改」才會真的存檔。</p>
+        <div id="editItemsWrap">
+          ${items.map(i => {
+            const p = DB.state.products.find(x => x.id === i.productId);
+            return `<div class="cart-line" data-item="${i.id}">
+              <span>${p?p.name:"（商品已刪除）"}</span>
+              <span style="display:flex; align-items:center; gap:8px;">
+                <input type="number" min="1" value="${i.qty}" class="editQtyInput" data-item="${i.id}" style="width:64px; padding:6px 8px;"/>
+                <span>× ${ncFmt(i.unitPrice)}</span>
+                <button class="btn btn-ghost btn-small removeItemBtn" data-item="${i.id}">移除</button>
+              </span>
+            </div>`;
+          }).join("") || `<p style="color:var(--ink-soft)">目前沒有商品項目</p>`}
+        </div>
+        <div class="row" style="margin-top:12px;">
+          <div class="field" style="flex:2"><label>新增商品</label>
+            <select id="addItemSelect">
+              <option value="">－ 選擇商品 －</option>
+              ${DB.listProducts(order.batchId).map(p => `<option value="${p.id}">${p.name}（NT$${p.sellPrice}）</option>`).join("")}
+            </select>
+          </div>
+          <div class="field" style="max-width:90px"><label>數量</label><input id="addItemQty" type="number" value="1" min="1"/></div>
+          <div class="field" style="justify-content:flex-end"><button class="btn btn-ghost btn-small" id="addItemBtn">加入</button></div>
+        </div>
+
+        <div class="row" style="margin-top:16px;">
+          <div class="field"><label>收件人姓名</label><input id="editRName" value="${order.recipient?.name||""}"/></div>
+          <div class="field"><label>收件人電話</label><input id="editRPhone" value="${order.recipient?.phone||""}"/></div>
+        </div>
+        <div class="field"><label>收件地址</label><input id="editRAddr" value="${order.recipient?.address||""}"/></div>
+        <div class="row">
+          <div class="field"><label>寄送方式</label>
+            <select id="editRShip">
+              ${DB.listShippingMethods().map(m => `<option ${order.recipient?.shipMethod===m.name?"selected":""}>${m.name}</option>`).join("")}
+            </select>
+          </div>
+          <div class="field" style="max-width:160px"><label>運費(TWD)</label><input id="editShipFee" type="number" value="${order.shippingFee||0}"/></div>
+        </div>
+        <button class="btn btn-primary" id="saveOrderEditBtn">儲存訂單修改</button>
+      </div>
+
+      <div class="card no-print">
         <h2>訂單狀態</h2>
         <select id="statusSelect">
           ${["待付款","待核對","已付款","已出貨","已完成","已取消"].map(s => `<option ${s===order.status?"selected":""}>${s}</option>`).join("")}
@@ -168,6 +214,52 @@ ncBoot("orders.html", "訂單", (el) => {
       </div>`;
 
     document.getElementById("toListBtn").addEventListener("click", renderList);
+
+    document.getElementById("deleteOrderBtn").addEventListener("click", () => {
+      if (!confirm("確定要刪除整張訂單嗎？這個動作無法復原，商品庫存會恢復。")) return;
+      Promise.resolve(DB.deleteOrder(orderId)).then(() => { location.href = "orders.html"; })
+        .catch(err => alert("刪除失敗，請檢查網路連線後再試一次。\n" + (err && err.message ? err.message : err)));
+    });
+
+    document.querySelectorAll(".removeItemBtn").forEach(btn => {
+      btn.addEventListener("click", () => {
+        DB.removeOrderItem(btn.dataset.item);
+        renderDetail(orderId);
+      });
+    });
+    document.querySelectorAll(".editQtyInput").forEach(input => {
+      input.addEventListener("change", () => {
+        const qty = Math.max(1, Number(input.value) || 1);
+        DB.setOrderItemQty(input.dataset.item, qty);
+        renderDetail(orderId);
+      });
+    });
+    document.getElementById("addItemBtn").addEventListener("click", () => {
+      const pid = document.getElementById("addItemSelect").value;
+      const qty = Math.max(1, Number(document.getElementById("addItemQty").value) || 1);
+      if (!pid) return;
+      const p = DB.state.products.find(x => x.id === pid);
+      DB.addOrderItem(orderId, pid, qty, Number(p.sellPrice) || 0);
+      renderDetail(orderId);
+    });
+    document.getElementById("saveOrderEditBtn").addEventListener("click", () => {
+      const btn = document.getElementById("saveOrderEditBtn");
+      btn.disabled = true; btn.textContent = "儲存中…";
+      DB.updateOrderRecipient(orderId, {
+        recipient: {
+          name: document.getElementById("editRName").value,
+          phone: document.getElementById("editRPhone").value,
+          address: document.getElementById("editRAddr").value,
+          shipMethod: document.getElementById("editRShip").value
+        },
+        shippingFee: Number(document.getElementById("editShipFee").value) || 0
+      });
+      Promise.resolve(DB.save()).then(() => { renderDetail(orderId); })
+        .catch(err => {
+          btn.disabled = false; btn.textContent = "儲存訂單修改";
+          alert("儲存失敗，請檢查網路連線後再試一次。\n" + (err && err.message ? err.message : err));
+        });
+    });
     document.getElementById("statusSelect").addEventListener("change", e => DB.updateOrderStatus(order.id, e.target.value));
     document.getElementById("custEditSaveBtn").addEventListener("click", () => {
       DB.updateCustomerFields(customer.id, {

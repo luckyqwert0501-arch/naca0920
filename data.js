@@ -213,6 +213,11 @@ const DB = {
 
   // ---- customers (顧客, matched by phone) ----
   findCustomerByPhone(phone) { return this.state.customers.find(c => c.phone === phone); },
+  // 注意：這裡故意不呼叫 this.save()。upsertCustomer 目前只會被 submitOrder
+  // 呼叫，如果這裡自己也存檔一次，會跟 submitOrder 最後的存檔變成兩個各自
+  // 送出的網路請求，彼此沒有先後保證，偶爾會讓比較早送出、但資料比較舊的
+  // 這一次「後到」蓋掉後面才送出、資料完整的那一次，導致訂單看起來憑空
+  // 消失。改成只更新本機資料，交給呼叫端（submitOrder）最後一次存檔。
   upsertCustomer(c) {
     let existing = c.phone ? this.findCustomerByPhone(c.phone) : null;
     if (existing) {
@@ -220,12 +225,10 @@ const DB = {
       const patch = { ...c };
       if (existing.birthday) delete patch.birthday;
       Object.assign(existing, patch);
-      this.save();
       return existing;
     }
     const record = { id: ncId("CUS"), ...c };
     this.state.customers.push(record);
-    this.save();
     return record;
   },
   searchCustomers(query) {
@@ -330,6 +333,52 @@ const DB = {
 
     const saved = this.save();
     return { order, isFirstForCustomer, saved };
+  },
+
+  // ---- order editing ----
+  // 這幾個都只改本機資料、不各自存檔，避免一次改好幾樣東西時觸發好幾個
+  // 各自送出的網路請求互相搶（就是訂單消失那個 bug 的成因）。改完後由
+  // 畫面上的「儲存訂單修改」按鈕統一呼叫一次 DB.save()。
+  updateOrderRecipient(orderId, patch) {
+    const o = this.getOrder(orderId);
+    if (!o) return null;
+    o.recipient = { ...o.recipient, ...(patch.recipient || {}) };
+    if (patch.shippingFee !== undefined) o.shippingFee = patch.shippingFee;
+    o.updatedAt = Date.now();
+    return o;
+  },
+  setOrderItemQty(itemId, qty) {
+    const item = this.state.orderItems.find(i => i.id === itemId);
+    if (!item) return;
+    const p = this.state.products.find(x => x.id === item.productId);
+    const delta = qty - item.qty;
+    if (p) p.sold = Math.max(0, (Number(p.sold) || 0) + delta);
+    item.qty = qty;
+    item.subtotal = qty * item.unitPrice;
+  },
+  removeOrderItem(itemId) {
+    const idx = this.state.orderItems.findIndex(i => i.id === itemId);
+    if (idx < 0) return;
+    const item = this.state.orderItems[idx];
+    const p = this.state.products.find(x => x.id === item.productId);
+    if (p) p.sold = Math.max(0, (Number(p.sold) || 0) - item.qty);
+    this.state.orderItems.splice(idx, 1);
+  },
+  addOrderItem(orderId, productId, qty, unitPrice) {
+    this.state.orderItems.push({ id: ncId("ITM"), orderId, productId, qty, unitPrice, subtotal: qty * unitPrice });
+    const p = this.state.products.find(x => x.id === productId);
+    if (p) p.sold = (Number(p.sold) || 0) + qty;
+  },
+  // 刪除訂單是單一、獨立的操作，跟前面幾個不一樣：這裡直接存檔一次就好。
+  deleteOrder(orderId) {
+    const items = this.orderItemsFor(orderId);
+    items.forEach(i => {
+      const p = this.state.products.find(x => x.id === i.productId);
+      if (p) p.sold = Math.max(0, (Number(p.sold) || 0) - i.qty);
+    });
+    this.state.orderItems = this.state.orderItems.filter(i => i.orderId !== orderId);
+    this.state.orders = this.state.orders.filter(o => o.id !== orderId);
+    return this.save();
   },
 
   updateOrderStatus(orderId, status) {

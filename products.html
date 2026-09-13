@@ -42,7 +42,8 @@ ncBoot("products.html", "商品輸入", (el) => {
           <button class="btn btn-ghost btn-small" id="quickToggleBtn">${quickExpanded ? "收合 ▲" : "展開 ▼"}</button>
         </div>
         <div id="quickWrap" style="${quickExpanded ? "" : "display:none;"} margin-top:10px;">
-          <p class="hint">勾選「常態商品」的品項，之後在設定頁建立新期別時會自動帶入，不用每次重打。</p>
+          <p class="hint">勾選「常態商品」的品項，之後在設定頁建立新期別時會自動帶入，不用每次重打。新增的商品會出現在最上方，不用捲到最下面。</p>
+          <button class="btn btn-primary btn-small" id="addRowBtn" style="margin-bottom:10px;">＋ 新增一列</button>
           <div class="grid-wrap freeze-wrap">
             <table class="grid" id="pTable">
               <thead><tr>
@@ -53,7 +54,6 @@ ncBoot("products.html", "商品輸入", (el) => {
               <tbody id="pTbody"></tbody>
             </table>
           </div>
-          <button class="btn btn-ghost btn-small" id="addRowBtn" style="margin-top:8px;">＋ 新增一列</button>
         </div>
       </div>
 
@@ -75,8 +75,8 @@ ncBoot("products.html", "商品輸入", (el) => {
       </div>`;
 
     const tbody = document.getElementById("pTbody");
-    products.forEach(p => tbody.appendChild(productRow(p)));
-    document.getElementById("addRowBtn").addEventListener("click", () => tbody.appendChild(productRow(null)));
+    products.slice().reverse().forEach(p => tbody.appendChild(productRow(p)));
+    document.getElementById("addRowBtn").addEventListener("click", () => tbody.insertBefore(productRow(null), tbody.firstChild));
 
     const rtbody = document.getElementById("rTbody");
     DB.state.seriesRules.filter(r => r.batchId === batch.id).forEach(r => rtbody.appendChild(ruleRow(r)));
