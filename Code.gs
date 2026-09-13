@@ -56,12 +56,12 @@ const BATCH_FIELDS = [
 const PRODUCT_FIELDS = [
   { key: "id", header: "商品ID" },
   { key: "batchId", header: "期別ID" },
-  { key: "purchaseType", header: "採購方式" },
   { key: "series", header: "系列" },
   { key: "name", header: "商品名稱" },
   { key: "jpyAmount", header: "日幣金額" },
   { key: "cardFeePct", header: "刷卡手續費%" },
   { key: "taxRefundFee", header: "退稅%" },
+  { key: "agentFeePct", header: "代買%" },
   { key: "exchangeRate", header: "匯率" },
   { key: "weightG", header: "重量(公克)" },
   { key: "shippingTWD", header: "運費(TWD)" },
