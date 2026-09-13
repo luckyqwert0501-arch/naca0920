@@ -17,6 +17,8 @@ ncBoot("products.html", "商品輸入", (el) => {
   if (!batch) { el.innerHTML = `<div class="card">請先到「總覽」建立期別。</div>`; return; }
 
   let invExpanded = true;
+  let quickExpanded = true;
+  let ruleExpanded = true;
 
   function renderTable() {
     const products = DB.listProducts(batch.id);
@@ -26,7 +28,7 @@ ncBoot("products.html", "商品輸入", (el) => {
           <h2 style="margin:0;">庫存總覽</h2>
           <button class="btn btn-ghost btn-small" id="invToggleBtn">${invExpanded ? "收合 ▲" : "展開 ▼"}</button>
         </div>
-        <div class="grid-wrap" id="invWrap" style="${invExpanded ? "" : "display:none;"} margin-top:10px;">
+        <div class="grid-wrap freeze-wrap" id="invWrap" style="${invExpanded ? "" : "display:none;"} margin-top:10px;">
           <table class="grid" id="invTable">
             <thead><tr><th>商品名稱</th><th>成本</th><th>售價</th><th>利潤</th><th>可售庫存</th></tr></thead>
             <tbody id="invTbody"></tbody>
@@ -35,31 +37,41 @@ ncBoot("products.html", "商品輸入", (el) => {
       </div>
 
       <div class="card">
-        <h2>快速輸入（Tab 鍵可在欄位間跳動，一列填完自動新增下一列）</h2>
-        <p class="hint">勾選「常態商品」的品項，之後在設定頁建立新期別時會自動帶入，不用每次重打。</p>
-        <div class="grid-wrap">
-          <table class="grid" id="pTable">
-            <thead><tr>
-              <th>系列</th><th>商品名稱</th><th>日幣金額</th>
-              <th>刷卡手續費%</th><th>退稅%</th><th>代買%</th><th>匯率</th><th>重量(公克)</th>
-              <th>運費(自動)</th><th>成本TWD(自動)</th><th>售價</th><th>庫存</th><th>發票</th><th>常態商品</th><th></th>
-            </tr></thead>
-            <tbody id="pTbody"></tbody>
-          </table>
+        <div class="row" style="align-items:center; justify-content:space-between;">
+          <h2 style="margin:0;">快速輸入</h2>
+          <button class="btn btn-ghost btn-small" id="quickToggleBtn">${quickExpanded ? "收合 ▲" : "展開 ▼"}</button>
         </div>
-        <button class="btn btn-ghost btn-small" id="addRowBtn" style="margin-top:8px;">＋ 新增一列</button>
+        <div id="quickWrap" style="${quickExpanded ? "" : "display:none;"} margin-top:10px;">
+          <p class="hint">勾選「常態商品」的品項，之後在設定頁建立新期別時會自動帶入，不用每次重打。</p>
+          <div class="grid-wrap freeze-wrap">
+            <table class="grid" id="pTable">
+              <thead><tr>
+                <th>系列</th><th>商品名稱</th><th>日幣金額</th>
+                <th>刷卡手續費%</th><th>退稅%</th><th>代買%</th><th>匯率</th><th>重量(公克)</th>
+                <th>運費(自動)</th><th>成本TWD(自動)</th><th>售價</th><th>庫存</th><th>發票</th><th>常態商品</th><th></th>
+              </tr></thead>
+              <tbody id="pTbody"></tbody>
+            </table>
+          </div>
+          <button class="btn btn-ghost btn-small" id="addRowBtn" style="margin-top:8px;">＋ 新增一列</button>
+        </div>
       </div>
 
       <div class="card">
-        <h2>系列組合價規則</h2>
-        <p style="color:var(--ink-soft); font-size:.85rem; margin-top:-6px;">同一「系列」的商品，購物車累計件數達門檻時，套用門檻單價（例如畢業毛巾滿3件變299）。</p>
-        <div class="grid-wrap">
-          <table class="grid" id="rTable">
-            <thead><tr><th>系列名稱</th><th>門檻件數</th><th>門檻後單價</th><th></th></tr></thead>
-            <tbody id="rTbody"></tbody>
-          </table>
+        <div class="row" style="align-items:center; justify-content:space-between;">
+          <h2 style="margin:0;">系列組合價規則</h2>
+          <button class="btn btn-ghost btn-small" id="ruleToggleBtn">${ruleExpanded ? "收合 ▲" : "展開 ▼"}</button>
         </div>
-        <button class="btn btn-ghost btn-small" id="addRuleBtn" style="margin-top:8px;">＋ 新增規則</button>
+        <div id="ruleWrap" style="${ruleExpanded ? "" : "display:none;"} margin-top:10px;">
+          <p style="color:var(--ink-soft); font-size:.85rem; margin-top:-6px;">同一「系列」的商品，購物車累計件數達門檻時，套用門檻單價（例如畢業毛巾滿3件變299）。</p>
+          <div class="grid-wrap freeze-wrap">
+            <table class="grid" id="rTable">
+              <thead><tr><th>系列名稱</th><th>門檻件數</th><th>門檻後單價</th><th></th></tr></thead>
+              <tbody id="rTbody"></tbody>
+            </table>
+          </div>
+          <button class="btn btn-ghost btn-small" id="addRuleBtn" style="margin-top:8px;">＋ 新增規則</button>
+        </div>
       </div>`;
 
     const tbody = document.getElementById("pTbody");
@@ -70,11 +82,18 @@ ncBoot("products.html", "商品輸入", (el) => {
     DB.state.seriesRules.filter(r => r.batchId === batch.id).forEach(r => rtbody.appendChild(ruleRow(r)));
     document.getElementById("addRuleBtn").addEventListener("click", () => rtbody.appendChild(ruleRow(null)));
 
-    document.getElementById("invToggleBtn").addEventListener("click", () => {
-      invExpanded = !invExpanded;
-      document.getElementById("invWrap").style.display = invExpanded ? "" : "none";
-      document.getElementById("invToggleBtn").textContent = invExpanded ? "收合 ▲" : "展開 ▼";
-    });
+    function wireToggle(btnId, wrapId, getSet) {
+      document.getElementById(btnId).addEventListener("click", () => {
+        const val = !getSet();
+        getSet(val);
+        const wrap = document.getElementById(wrapId);
+        wrap.style.display = val ? "" : "none";
+        document.getElementById(btnId).textContent = val ? "收合 ▲" : "展開 ▼";
+      });
+    }
+    wireToggle("invToggleBtn", "invWrap", (v) => { if (v === undefined) return invExpanded; invExpanded = v; });
+    wireToggle("quickToggleBtn", "quickWrap", (v) => { if (v === undefined) return quickExpanded; quickExpanded = v; });
+    wireToggle("ruleToggleBtn", "ruleWrap", (v) => { if (v === undefined) return ruleExpanded; ruleExpanded = v; });
 
     renderInventory();
   }

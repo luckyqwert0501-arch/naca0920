@@ -114,7 +114,19 @@ const DB = {
     return fetch(NC_GAS_URL, {
       method: "POST",
       body: JSON.stringify({ action: "saveAll", payload: syncState })
-    }).catch(err => { console.error("同步到後端失敗（已存在本機，之後會再嘗試）：", err); });
+    })
+      .then(res => res.json())
+      .then(data => {
+        if (data && data.error) {
+          console.error("後端存檔失敗：", data.error);
+          throw new Error(data.error);
+        }
+        return data;
+      })
+      .catch(err => {
+        console.error("同步到後端失敗（本機已經有存，但雲端可能沒更新到）：", err);
+        throw err; // 讓真正需要「等存檔完成再繼續」的地方（例如送出訂單）能抓到失敗
+      });
   },
 
   // 跟 init() 不同：一定會真的重新跟後端要一次最新資料（init() 只抓第一次，

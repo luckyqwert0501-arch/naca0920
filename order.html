@@ -50,7 +50,7 @@ ncBoot("order.html", "顧客入單", (el) => {
           <div id="custSearchResults"></div>
         </div>
         <div class="row">
-          <div class="field"><label>電話（顧客識別依據，急件可先空著，之後再補）</label><input id="custPhone" value="${customer.phone}"/></div>
+          <div class="field"><label>電話（顧客識別依據）</label><input id="custPhone" value="${customer.phone}"/></div>
           <div class="field"><label>姓名</label><input id="custName" value="${customer.name}"/></div>
           <div class="field"><label>Line名稱</label><input id="custLine" value="${customer.lineName}"/></div>
           <div class="field">
@@ -224,6 +224,9 @@ ncBoot("order.html", "顧客入單", (el) => {
       // 如果太早跳頁，可能會因為後端還沒寫完而看起來像「訂單不見了」。
       Promise.resolve(result.saved).then(() => {
         location.href = "orders.html?order=" + result.order.id;
+      }).catch(err => {
+        btn.disabled = false; btn.textContent = "送出訂單";
+        alert("訂單存檔到後端失敗，訂單目前只存在這台裝置，請檢查網路連線後再試一次送出。\n\n錯誤訊息：" + (err && err.message ? err.message : err));
       });
     });
   }

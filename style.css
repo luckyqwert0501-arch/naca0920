@@ -160,7 +160,13 @@ table.grid tbody tr:hover{ background:#FBF8F1; }
   table.grid td[data-label=""] button{ width:100%; }
 }
 
-/* ---------- Frozen header row + first column(s) for the products page tables ---------- */
+/* ---------- Frozen header row + first column(s) for the products page tables ----------
+   注意：sticky 一定要「有一個真的會內部捲動的容器」才會生效——外層只設
+   overflow-x:auto、高度又是自動撐開的話，裡面永遠不會真的捲動，sticky
+   就不會有作用。所以這幾張表格額外給一個上限高度＋overflow-y:auto，
+   讓表格自己內部捲動，凍結列/欄才看得出效果。 */
+.freeze-wrap{ max-height: 65vh; overflow-y: auto; overflow-x: auto; }
+
 #pTable thead th, #rTable thead th, #invTable thead th{
   position: sticky; top: 0; z-index: 3; background: var(--paper-raised); box-shadow: 0 1px 0 var(--line);
 }
@@ -179,6 +185,7 @@ table.grid tbody tr:hover{ background:#FBF8F1; }
   #pTable th, #pTable td, #rTable th, #rTable td, #invTable th, #invTable td{
     position: static !important; box-shadow: none !important; min-width: 0 !important;
   }
+  .freeze-wrap{ max-height: none; overflow: visible; }
 }
 
 /* ---------- Plain read-only tables (always stays a real table, e.g. A4 slip) ---------- */
