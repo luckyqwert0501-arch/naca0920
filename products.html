@@ -35,8 +35,8 @@ ncBoot("products.html", "商品輸入", (el) => {
         <div class="grid-wrap">
           <table class="grid" id="pTable">
             <thead><tr>
-              <th>採購方式</th><th>系列</th><th>商品名稱</th><th>日幣金額</th>
-              <th>刷卡手續費%</th><th>退稅%</th><th>匯率</th><th>重量(公克)</th>
+              <th>系列</th><th>商品名稱</th><th>日幣金額</th>
+              <th>刷卡手續費%</th><th>退稅%</th><th>代買%</th><th>匯率</th><th>重量(公克)</th>
               <th>運費(自動)</th><th>成本TWD(自動)</th><th>售價</th><th>庫存</th><th>發票</th><th>常態商品</th><th></th>
             </tr></thead>
             <tbody id="pTbody"></tbody>
@@ -90,18 +90,16 @@ ncBoot("products.html", "商品輸入", (el) => {
 
   function productRow(p) {
     const tr = document.createElement("tr");
-    const data = p || { id: null, batchId: batch.id, purchaseType: "親自", series: "", name: "",
-      jpyAmount: "", cardFeePct: "", taxRefundFee: "", exchangeRate: "", weightG: "", sellPrice: "", stockQty: "", receiptPhoto: "", isStanding: false };
+    const data = p || { id: null, batchId: batch.id, series: "", name: "",
+      jpyAmount: "", cardFeePct: "", taxRefundFee: "", agentFeePct: "", exchangeRate: "", weightG: "", sellPrice: "", stockQty: "", receiptPhoto: "", isStanding: false };
 
     tr.innerHTML = `
-      <td data-label="採購方式"><select data-k="purchaseType">
-        ${["親自","代買10%","MDM","網路訂購"].map(o => `<option ${data.purchaseType===o?"selected":""}>${o}</option>`).join("")}
-      </select></td>
       <td data-label="系列"><input data-k="series" value="${data.series||""}" placeholder="例：畢業毛巾"/></td>
       <td data-label="商品名稱"><input data-k="name" value="${data.name||""}" placeholder="商品名稱"/></td>
       <td data-label="日幣金額"><input data-k="jpyAmount" type="number" value="${data.jpyAmount}" /></td>
       <td data-label="刷卡手續費%"><input data-k="cardFeePct" type="number" value="${data.cardFeePct}" /></td>
       <td data-label="退稅%"><input data-k="taxRefundFee" type="number" value="${data.taxRefundFee}" /></td>
+      <td data-label="代買%"><input data-k="agentFeePct" type="number" placeholder="0" value="${data.agentFeePct}" /></td>
       <td data-label="匯率"><input data-k="exchangeRate" type="number" step="0.01" value="${data.exchangeRate}" /></td>
       <td data-label="重量(公克)"><input data-k="weightG" type="number" step="1" placeholder="例：200" value="${data.weightG}" /></td>
       <td data-label="運費(自動)" class="shipVal" style="color:var(--ink-soft)">－</td>
@@ -125,18 +123,25 @@ ncBoot("products.html", "商品輸入", (el) => {
       return rec;
     }
 
+    function costLabel(rec, costTWD) {
+      const agentPct = Number(rec.agentFeePct) || 0;
+      const note = agentPct > 0 ? `<br/><span style="font-size:.72rem; color:var(--ink-soft); font-weight:400;">（已含代買${agentPct}%）</span>` : "";
+      return ncFmt(costTWD) + note;
+    }
+
     function recalcAndSave() {
       const rec = collect();
       if (!rec.name) return; // don't save empty rows
       const saved = DB.upsertProduct(rec);
       data.id = saved.id;
       tr.querySelector(".shipVal").textContent = ncFmt(saved.shippingTWD);
-      tr.querySelector(".costVal").textContent = ncFmt(saved.costTWD);
+      tr.querySelector(".costVal").innerHTML = costLabel(saved, saved.costTWD);
       renderInventory();
     }
 
     tr.querySelectorAll("input[data-k], select[data-k]").forEach(input => {
       input.addEventListener("input", recalcAndSave);
+      input.addEventListener("change", recalcAndSave);
     });
     const fileInput = tr.querySelector('input[type="file"]');
     fileInput.addEventListener("change", () => {
@@ -154,7 +159,7 @@ ncBoot("products.html", "商品輸入", (el) => {
 
     if (data.id) {
       tr.querySelector(".shipVal").textContent = ncFmt(p.shippingTWD);
-      tr.querySelector(".costVal").textContent = ncFmt(p.costTWD);
+      tr.querySelector(".costVal").innerHTML = costLabel(p, p.costTWD);
     }
     return tr;
   }

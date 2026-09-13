@@ -57,13 +57,13 @@ function ncId(prefix) {
 
 /* ---------------- Business calculations (shared, pure functions) ---------------- */
 
-// 成本(JPY) = 日幣金額 × (1 + 刷卡手續費% + 代買手續費%(採購方式為「代買10%」才有) － 退稅%)
+// 成本(JPY) = 日幣金額 × (1 + 刷卡手續費% + 代買% － 退稅%)
 // 成本(TWD) = 成本(JPY) × 匯率 ＋ 運費(重量公克 × 0.3)
 function calcCostTWD(p) {
   const jpy = Number(p.jpyAmount) || 0;
   const feePct = Number(p.cardFeePct) || 0;
   const taxRefundPct = Number(p.taxRefundFee) || 0;
-  const agentPct = (p.purchaseType === "代買10%") ? 10 : 0;
+  const agentPct = Number(p.agentFeePct) || 0;
   const rate = Number(p.exchangeRate) || 0;
   const weight = Number(p.weightG) || 0;
   const shippingTWD = weight * 0.3;
@@ -115,6 +115,19 @@ const DB = {
       method: "POST",
       body: JSON.stringify({ action: "saveAll", payload: syncState })
     }).catch(err => console.error("同步到後端失敗（已存在本機，之後會再嘗試）：", err));
+  },
+
+  // 跟 init() 不同：一定會真的重新跟後端要一次最新資料（init() 只抓第一次，
+  // 之後就重複用同一份）。顧客回報匯款是後端直接寫入的，不會自動反映在
+  // 畫面上，需要時可以呼叫這個手動/自動刷新一次。
+  refresh() {
+    return fetch(NC_GAS_URL + "?action=loadAll")
+      .then(res => res.json())
+      .then(data => {
+        this.state = ncMigrate(data);
+        localStorage.setItem(NC_KEY, JSON.stringify(this.state));
+      })
+      .catch(err => console.error("重新整理失敗：", err));
   },
 
   // ---- settings ----

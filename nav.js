@@ -84,8 +84,12 @@ function ncRenderShell(activeHref, contentHtml) {
 }
 
 /* Call this at the top of every internal page.
-   render(container) receives the #ncContent-equivalent and should build the page. */
-function ncBoot(activeHref, pageTitle, render) {
+   render(container) receives the #ncContent-equivalent and should build the page.
+   opts.freshOnly: true 表示這頁一定要等後端回應最新資料才顯示，不能先用本機
+   舊資料畫面（例如訂單頁要看顧客剛在別的裝置回報的匯款，不能顯示舊資料）。 */
+function ncBoot(activeHref, pageTitle, render, opts) {
+  opts = opts || {};
+
   function paint() {
     DB.releaseExpiredHolds();
     const start = () => {
@@ -95,6 +99,12 @@ function ncBoot(activeHref, pageTitle, render) {
     };
     if (ncRequireUnlock()) start();
     else ncRenderLockScreen(start);
+  }
+
+  if (opts.freshOnly) {
+    document.body.innerHTML = `<div style="min-height:100vh; display:flex; align-items:center; justify-content:center; color:var(--ink-soft); font-family:var(--font-body,sans-serif);">連線中…</div>`;
+    DB.init().then(paint);
+    return;
   }
 
   const cached = localStorage.getItem(NC_KEY);

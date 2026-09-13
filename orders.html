@@ -36,7 +36,7 @@ ncBoot("orders.html", "訂單", (el) => {
           　<a href="settings.html">前往設定頁修改 →</a></p>
       </div>
       <div class="card">
-        <h2>訂單列表</h2>
+        <h2>訂單列表 <button class="btn btn-ghost btn-small" id="refreshListBtn" style="margin-left:8px;">重新整理</button></h2>
         <div class="row">
           <div class="field" style="flex:2"><label>搜尋顧客姓名</label><input id="qInput" value="${filters.q}" placeholder="輸入姓名關鍵字"/></div>
           <div class="field"><label>付款狀態</label>
@@ -58,6 +58,7 @@ ncBoot("orders.html", "訂單", (el) => {
     document.getElementById("qInput").addEventListener("input", e => { filters.q = e.target.value; renderOrderRows(); });
     document.getElementById("statusFilter").addEventListener("change", e => { filters.status = e.target.value; renderOrderRows(); });
     document.getElementById("shipFilter").addEventListener("change", e => { filters.ship = e.target.value; renderOrderRows(); });
+    document.getElementById("refreshListBtn").addEventListener("click", () => { DB.refresh().then(renderList); });
     renderOrderRows();
   }
 
@@ -96,7 +97,8 @@ ncBoot("orders.html", "訂單", (el) => {
     return `【${settings.communityName}】\n訂單編號：${order.id}\n顧客姓名：${customer.name}\n\n【訂購商品】\n${lines}\n\n【費用總計】\n商品小計：${ncFmt(itemsSubtotal)}\n運費：${ncFmt(order.shippingFee)}\n總金額：${ncFmt(DB.orderTotal(order.id))}\n\n【匯款資訊】\n銀行代碼：${batch.bankCode||""}\n帳號：${batch.bankAccount||""}\n戶名：${batch.bankHolder||""}\n\n請完成匯款後點此回報金額與後五碼：\n${remittanceLink(order)}\n\n謝謝！`;
   }
 
-  function renderDetail(orderId) {
+  function renderDetail(orderId, opts) {
+    opts = opts || {};
     const order = DB.getOrder(orderId);
     const customer = DB.state.customers.find(c => c.id === order.customerId);
     const items = DB.orderItemsFor(orderId);
@@ -130,7 +132,7 @@ ncBoot("orders.html", "訂單", (el) => {
       </div>
 
       <div class="card no-print">
-        <h2>匯款回報記錄</h2>
+        <h2>匯款回報記錄 <button class="btn btn-ghost btn-small" id="refreshRemitBtn" style="margin-left:8px;">重新整理</button></h2>
         ${remits.length ? remits.map(r => `
           <div class="cart-line">
             <span>${r.name}／${r.phone}・回報 ${ncFmt(r.amount)}・後五碼 ${r.last5}</span>
@@ -166,10 +168,20 @@ ncBoot("orders.html", "訂單", (el) => {
       setTimeout(() => document.getElementById("copyLinkBtn").textContent = "複製連結", 1500);
     });
     document.getElementById("printBtn").addEventListener("click", () => window.print());
+    document.getElementById("refreshRemitBtn").addEventListener("click", () => {
+      DB.refresh().then(() => renderDetail(orderId, { autoRefreshed: true }));
+    });
+
+    // 顧客回報匯款是後端直接寫入的，不會自動出現在這裡；打開這張訂單時
+    // 自動在背景確認一次最新資料（這個畫面沒有正在輸入中的文字欄位，
+    // 重畫一次不會弄丟你打到一半的東西）。
+    if (!opts.autoRefreshed) {
+      DB.refresh().then(() => renderDetail(orderId, { autoRefreshed: true }));
+    }
   }
 
   if (openId) renderDetail(openId); else renderList();
-});
+}, { freshOnly: true });
 </script>
 </body>
 </html>
