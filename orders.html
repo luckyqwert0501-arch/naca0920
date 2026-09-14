@@ -94,6 +94,14 @@ ncBoot("orders.html", "訂單", (el) => {
       return `- ${p ? p.name : "商品"} x ${i.qty}  NT$${i.unitPrice}`;
     }).join("\n");
     const itemsSubtotal = items.reduce((s, i) => s + i.subtotal, 0);
+    const hasShippingInfo = !!(order.recipient && order.recipient.shipMethod);
+
+    if (!hasShippingInfo) {
+      // 還沒選寄送方式／填收件資訊：運費還沒定案，先不寫死總金額，
+      // 引導顧客自己去連結填寫，填完系統會直接顯示應付總額。
+      return `【${settings.communityName}】\n訂單編號：${order.id}\n顧客姓名：${customer.name}\n\n【訂購商品】\n${lines}\n\n商品小計：${ncFmt(itemsSubtotal)}（運費依您選擇的寄送方式計算）\n\n【匯款資訊】\n銀行代碼：${batch.bankCode||""}\n帳號：${batch.bankAccount||""}\n戶名：${batch.bankHolder||""}\n\n請點此連結填寫收件資訊、選擇寄送方式，系統會顯示應匯款總金額，並可直接回報匯款：\n${remittanceLink(order)}\n\n謝謝！`;
+    }
+
     return `【${settings.communityName}】\n訂單編號：${order.id}\n顧客姓名：${customer.name}\n\n【訂購商品】\n${lines}\n\n【費用總計】\n商品小計：${ncFmt(itemsSubtotal)}\n運費：${ncFmt(order.shippingFee)}\n總金額：${ncFmt(DB.orderTotal(order.id))}\n\n【匯款資訊】\n銀行代碼：${batch.bankCode||""}\n帳號：${batch.bankAccount||""}\n戶名：${batch.bankHolder||""}\n\n請完成匯款後點此回報金額與後五碼：\n${remittanceLink(order)}\n\n謝謝！`;
   }
 
@@ -129,7 +137,7 @@ ncBoot("orders.html", "訂單", (el) => {
           <h2 style="margin:0;">編輯訂單內容</h2>
           <button class="btn btn-danger btn-small" id="deleteOrderBtn">刪除整張訂單</button>
         </div>
-        <p class="hint">改數量、移除或新增商品後，記得按下面的「儲存訂單修改」才會真的存檔。</p>
+        <p class="hint">商品的數量／移除／新增都是改了就立刻存檔；收件人跟寄送方式要按最下面的「儲存訂單修改」。</p>
         <div id="editItemsWrap">
           ${items.map(i => {
             const p = DB.state.products.find(x => x.id === i.productId);
@@ -223,15 +231,24 @@ ncBoot("orders.html", "訂單", (el) => {
 
     document.querySelectorAll(".removeItemBtn").forEach(btn => {
       btn.addEventListener("click", () => {
+        btn.disabled = true; btn.textContent = "移除中…";
         DB.removeOrderItem(btn.dataset.item);
-        renderDetail(orderId);
+        Promise.resolve(DB.save()).then(() => renderDetail(orderId))
+          .catch(err => {
+            alert("移除失敗，請檢查網路連線後再試一次。\n" + (err && err.message ? err.message : err));
+            renderDetail(orderId);
+          });
       });
     });
     document.querySelectorAll(".editQtyInput").forEach(input => {
       input.addEventListener("change", () => {
         const qty = Math.max(1, Number(input.value) || 1);
         DB.setOrderItemQty(input.dataset.item, qty);
-        renderDetail(orderId);
+        Promise.resolve(DB.save()).then(() => renderDetail(orderId))
+          .catch(err => {
+            alert("更新數量失敗，請檢查網路連線後再試一次。\n" + (err && err.message ? err.message : err));
+            renderDetail(orderId);
+          });
       });
     });
     document.getElementById("addItemBtn").addEventListener("click", () => {
@@ -240,7 +257,11 @@ ncBoot("orders.html", "訂單", (el) => {
       if (!pid) return;
       const p = DB.state.products.find(x => x.id === pid);
       DB.addOrderItem(orderId, pid, qty, Number(p.sellPrice) || 0);
-      renderDetail(orderId);
+      Promise.resolve(DB.save()).then(() => renderDetail(orderId))
+        .catch(err => {
+          alert("加入商品失敗，請檢查網路連線後再試一次。\n" + (err && err.message ? err.message : err));
+          renderDetail(orderId);
+        });
     });
     document.getElementById("saveOrderEditBtn").addEventListener("click", () => {
       const btn = document.getElementById("saveOrderEditBtn");
@@ -296,7 +317,7 @@ ncBoot("orders.html", "訂單", (el) => {
   }
 
   if (openId) renderDetail(openId); else renderList();
-}, { freshOnly: true });
+});
 </script>
 </body>
 </html>

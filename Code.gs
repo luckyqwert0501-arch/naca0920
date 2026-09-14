@@ -315,10 +315,21 @@ function doGet(e) {
       const state = cached || loadAllState_();
       const order = state.orders.find(o => o.id === e.parameter.id);
       if (!order) return jsonOut_({ exists: false });
-      const items = state.orderItems.filter(i => i.orderId === order.id);
-      const itemsTotal = items.reduce((s, i) => s + (Number(i.subtotal) || 0), 0);
-      const total = itemsTotal + (Number(order.shippingFee) || 0);
-      return jsonOut_({ exists: true, id: order.id, total: total, communityName: state.settings.communityName });
+      const items = state.orderItems.filter(i => i.orderId === order.id).map(i => {
+        const p = state.products.find(x => x.id === i.productId);
+        return { name: p ? p.name : "商品", qty: i.qty, unitPrice: Number(i.unitPrice) || 0, subtotal: Number(i.subtotal) || 0 };
+      });
+      const itemsSubtotal = items.reduce((s, i) => s + i.subtotal, 0);
+      const shippingFee = Number(order.shippingFee) || 0;
+      const hasShippingInfo = !!(order.recipient && order.recipient.shipMethod);
+      const batch = state.batches.find(b => b.id === order.batchId) || {};
+      return jsonOut_({
+        exists: true, id: order.id, communityName: state.settings.communityName,
+        items: items, itemsSubtotal: itemsSubtotal, shippingFee: shippingFee, total: itemsSubtotal + shippingFee,
+        hasShippingInfo: hasShippingInfo, recipient: order.recipient || {},
+        shippingMethods: state.settings.shippingMethods || [],
+        bankCode: batch.bankCode || "", bankAccount: batch.bankAccount || "", bankHolder: batch.bankHolder || ""
+      });
     }
 
     return jsonOut_({ error: "unknown action" });
@@ -354,6 +365,26 @@ function doPost(e) {
       };
       writeCache_(fresh);
       return jsonOut_({ ok: true });
+    }
+
+    if (action === "submitShippingInfo") {
+      const orders = readOrders_();
+      const order = orders.find(o => o.id === payload.orderId);
+      if (!order) return jsonOut_({ error: "訂單不存在" });
+      const methods = readEntities_("寄送方式設定", SHIPPING_FIELDS);
+      const method = methods.find(m => m.name === payload.shipMethod);
+      order.recipient = { name: payload.name, phone: payload.phone, address: payload.address, shipMethod: payload.shipMethod };
+      order.shippingFee = method ? (Number(method.fee) || 0) : (Number(payload.shippingFee) || 0);
+      order.updatedAt = new Date().getTime();
+      writeOrders_(orders);
+      // 順便更新快取裡的這一筆，這樣後台不用等下一次 saveAll 才看得到
+      const cached = readCache_();
+      if (cached) {
+        const idx = (cached.orders || []).findIndex(o => o.id === order.id);
+        if (idx >= 0) cached.orders[idx] = order; else (cached.orders = cached.orders || []).push(order);
+        writeCache_(cached);
+      }
+      return jsonOut_({ ok: true, shippingFee: order.shippingFee });
     }
 
     if (action === "submitRemittance") {

@@ -255,14 +255,20 @@ const DB = {
   releaseExpiredHolds() {
     const hours = Number(this.state.settings.cartHoldHours) || 24;
     const cutoff = Date.now() - hours * 3600 * 1000;
+    let releasedAny = false;
     this.state.cartHolds.forEach(h => {
       if (h.status === "保留中" && h.createdAt < cutoff) {
         h.status = "已釋放";
+        releasedAny = true;
         const p = this.state.products.find(x => x.id === h.productId);
         if (p) { p.reserved = Math.max(0, (Number(p.reserved) || 0) - Number(h.qty)); }
       }
     });
-    this.save();
+    // 這裡以前不管有沒有真的釋放任何東西都會存檔一次——代表你只是「打開頁面」
+    // 就會把瀏覽器裡當下這份（可能是舊的）資料整包回傳蓋掉後端，如果剛好是
+    // 用很久沒開、資料比較舊的分頁/裝置打開，就會把其他裝置後來新增的訂單蓋掉。
+    // 這正是訂單「不穩定、有時候不見」的根本原因，現在改成真的有變化才存檔。
+    if (releasedAny) this.save();
   },
   holdStock(productId, qty) {
     this.releaseExpiredHolds();

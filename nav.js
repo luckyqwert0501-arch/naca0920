@@ -85,12 +85,16 @@ function ncRenderShell(activeHref, contentHtml) {
 
 /* Call this at the top of every internal page.
    render(container) receives the #ncContent-equivalent and should build the page.
-   opts.freshOnly: true 表示這頁一定要等後端回應最新資料才顯示，不能先用本機
-   舊資料畫面（例如訂單頁要看顧客剛在別的裝置回報的匯款，不能顯示舊資料）。 */
-function ncBoot(activeHref, pageTitle, render, opts) {
-  opts = opts || {};
 
-  function paint() {
+   注意：這裡故意一律等後端資料回來才顯示畫面（不再有「先用本機舊資料
+   立刻畫面」的捷徑）。原本那個優化是造成訂單/資料不穩定的根本原因：
+   只要瀏覽器裡剛好留著一份比較舊的本機資料，一打開頁面（甚至什麼都
+   還沒做）就可能把後端最新資料覆蓋回舊的，等於把其他裝置後來新增的
+   訂單洗掉。寧可頁面切換慢個幾秒，也不要再發生資料不見的狀況。
+   Code.gs 那邊已經有加速讀取用的快取，實際等待時間不會像最早那樣久。 */
+function ncBoot(activeHref, pageTitle, render) {
+  document.body.innerHTML = `<div style="min-height:100vh; display:flex; align-items:center; justify-content:center; color:var(--ink-soft); font-family:var(--font-body,sans-serif);">連線中…</div>`;
+  DB.init().then(() => {
     DB.releaseExpiredHolds();
     const start = () => {
       ncRenderShell(activeHref, "");
@@ -99,30 +103,5 @@ function ncBoot(activeHref, pageTitle, render, opts) {
     };
     if (ncRequireUnlock()) start();
     else ncRenderLockScreen(start);
-  }
-
-  if (opts.freshOnly) {
-    document.body.innerHTML = `<div style="min-height:100vh; display:flex; align-items:center; justify-content:center; color:var(--ink-soft); font-family:var(--font-body,sans-serif);">連線中…</div>`;
-    DB.init().then(paint);
-    return;
-  }
-
-  const cached = localStorage.getItem(NC_KEY);
-  if (cached) {
-    // 先用本機上一次的資料立刻畫面，不用每次都等後端回應（後端讀取
-    // Google Sheet 本來就需要幾秒鐘，等待會讓每個頁面都感覺很慢）。
-    try {
-      DB.state = ncMigrate(JSON.parse(cached));
-      paint();
-    } catch (e) { /* 本機資料壞掉就照舊等後端 */ }
-  }
-
-  if (!DB.state) {
-    document.body.innerHTML = `<div style="min-height:100vh; display:flex; align-items:center; justify-content:center; color:var(--ink-soft); font-family:var(--font-body,sans-serif);">連線中…</div>`;
-    DB.init().then(paint);
-  } else {
-    // 已經先畫出本機資料了，背景偷偷跟後端同步最新版本，不會打斷畫面。
-    // 如果你剛好在另一台裝置改過資料，重新整理一次就會抓到最新的。
-    DB.init();
-  }
+  });
 }

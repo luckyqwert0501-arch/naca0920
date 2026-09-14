@@ -3,15 +3,16 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>匯款回報</title>
+<title>訂單確認與匯款回報</title>
 <link rel="stylesheet" href="style.css" />
 </head>
 <body>
 <!--
-  這頁不含密碼保護，是給顧客用的。它只透過下面兩個 GAS 動作跟後端溝通：
-  - GET  ?action=orderSummary&id=... 讀取單一訂單的金額摘要（不會拿到其他資料）
-  - POST action=submitRemittance      送出回報
-  完全不會載入商品、其他顧客、設定密碼等後台資料。
+  這頁不含密碼保護，是給顧客用的。只透過幾個 GAS 動作跟後端溝通：
+  - GET  ?action=orderSummary&id=...  讀單一訂單的商品明細＋是否已填收件資訊
+  - POST action=submitShippingInfo    顧客自己選寄送方式、填收件資訊
+  - POST action=submitRemittance      送出匯款回報
+  完全不會載入商品目錄、其他顧客、設定密碼等後台資料。
 -->
 <script src="config.js"></script>
 <div class="public-page" id="app">連線中…</div>
@@ -28,25 +29,92 @@
     return;
   }
 
-  fetch(NC_GAS_URL + "?action=orderSummary&id=" + encodeURIComponent(orderId))
-    .then(res => res.json())
-    .then(data => {
-      if (!data.exists) {
-        app.innerHTML = `<div class="notice-box">找不到這張訂單，請確認您點的是店家傳給您的完整連結。</div>`;
-        return;
-      }
-      renderForm(data);
-    })
-    .catch(() => {
-      app.innerHTML = `<div class="notice-box">目前連線不到系統，請稍後再試一次。</div>`;
-    });
+  function load() {
+    fetch(NC_GAS_URL + "?action=orderSummary&id=" + encodeURIComponent(orderId))
+      .then(res => res.json())
+      .then(data => {
+        if (!data.exists) {
+          app.innerHTML = `<div class="notice-box">找不到這張訂單，請確認您點的是店家傳給您的完整連結。</div>`;
+          return;
+        }
+        if (!data.hasShippingInfo) renderShippingStep(data);
+        else renderRemitStep(data);
+      })
+      .catch(() => {
+        app.innerHTML = `<div class="notice-box">目前連線不到系統，請稍後再試一次。</div>`;
+      });
+  }
 
-  function renderForm(data) {
+  function itemsTableHtml(data) {
+    return `
+      <div class="card">
+        <h3 style="margin-top:0;">訂購商品</h3>
+        ${data.items.map(i => `<div class="cart-line"><span>${i.name} × ${i.qty}</span><span>${fmt(i.subtotal)}</span></div>`).join("")}
+        <div class="cart-line"><span>商品小計</span><span>${fmt(data.itemsSubtotal)}</span></div>
+        <div class="cart-line"><span>運費</span><span>${fmt(data.shippingFee)}</span></div>
+        <div class="cart-total"><span>應匯款總金額</span><span>${fmt(data.total)}</span></div>
+      </div>
+      <div class="card">
+        <h3 style="margin-top:0;">匯款資訊</h3>
+        <div class="cart-line"><span>銀行代碼</span><span>${data.bankCode||"－"}</span></div>
+        <div class="cart-line"><span>帳號</span><span>${data.bankAccount||"－"}</span></div>
+        <div class="cart-line"><span>戶名</span><span>${data.bankHolder||"－"}</span></div>
+      </div>`;
+  }
+
+  /* ---- Step 1: 顧客自己選寄送方式、填收件資訊 ---- */
+  function renderShippingStep(data) {
     const brand = data.communityName || "好日集 NANACACA";
     app.innerHTML = `
       <div class="brand-mark">${brand}</div>
-      <div class="sub">匯款回報</div>
-      <div class="notice-box">訂單編號：${orderId}<br/>應付金額：${fmt(data.total)}</div>
+      <div class="sub">訂單確認 － 第 1 步：收件資訊</div>
+      <div class="notice-box">訂單編號：${orderId}<br/>請先填寫收件資訊並選擇寄送方式，下一步才會顯示應匯款金額。</div>
+      <div class="card">
+        <div class="field"><label>收件人姓名</label><input id="sName"/></div>
+        <div class="field"><label>收件人電話</label><input id="sPhone"/></div>
+        <div class="field"><label>收件地址</label><input id="sAddr"/></div>
+        <div class="field"><label>寄送方式</label>
+          <select id="sShip">
+            ${data.shippingMethods.map(m => `<option value="${m.name}">${m.name}（運費 ${fmt(m.fee)}）</option>`).join("")}
+          </select>
+        </div>
+        <div id="sErr" style="color:var(--danger); font-size:.85rem;"></div>
+        <button class="btn btn-primary" id="sSubmit" style="width:100%; margin-top:6px;">下一步</button>
+      </div>`;
+
+    document.getElementById("sSubmit").addEventListener("click", () => {
+      const name = document.getElementById("sName").value.trim();
+      const phone = document.getElementById("sPhone").value.trim();
+      const address = document.getElementById("sAddr").value.trim();
+      const shipMethod = document.getElementById("sShip").value;
+      const errEl = document.getElementById("sErr");
+      if (!name || !phone || !address) { errEl.textContent = "請完整填寫收件人姓名、電話與地址"; return; }
+
+      const btn = document.getElementById("sSubmit");
+      btn.disabled = true; btn.textContent = "送出中…";
+      fetch(NC_GAS_URL, {
+        method: "POST",
+        body: JSON.stringify({ action: "submitShippingInfo", payload: { orderId, name, phone, address, shipMethod } })
+      }).then(res => res.json()).then(res => {
+        if (res && res.error) throw new Error(res.error);
+        data.shippingFee = res.shippingFee;
+        data.total = data.itemsSubtotal + res.shippingFee;
+        data.hasShippingInfo = true;
+        renderRemitStep(data);
+      }).catch(err => {
+        btn.disabled = false; btn.textContent = "下一步";
+        errEl.textContent = "送出失敗，請檢查網路連線後再試一次。" + (err && err.message ? err.message : "");
+      });
+    });
+  }
+
+  /* ---- Step 2: 顯示明細＋總金額，並回報匯款 ---- */
+  function renderRemitStep(data) {
+    const brand = data.communityName || "好日集 NANACACA";
+    app.innerHTML = `
+      <div class="brand-mark">${brand}</div>
+      <div class="sub">訂單確認 － 第 2 步：匯款回報</div>
+      ${itemsTableHtml(data)}
       <div class="card">
         <div class="field"><label>您的姓名</label><input id="rName"/></div>
         <div class="field"><label>您的電話</label><input id="rPhone"/></div>
@@ -69,15 +137,18 @@
       fetch(NC_GAS_URL, {
         method: "POST",
         body: JSON.stringify({ action: "submitRemittance", payload: { orderId, name, phone, amount: Number(amount), last5 } })
-      }).then(() => {
+      }).then(res => res.json()).then(res => {
+        if (res && res.error) throw new Error(res.error);
         app.innerHTML = `<div class="brand-mark">${brand}</div>
           <div class="success-box">回報成功，謝謝您！店家確認匯款後會盡快為您安排出貨。</div>`;
-      }).catch(() => {
-        errEl.textContent = "送出失敗，請檢查網路連線後再試一次";
+      }).catch(err => {
         btn.disabled = false; btn.textContent = "送出回報";
+        errEl.textContent = "送出失敗，請檢查網路連線後再試一次。" + (err && err.message ? err.message : "");
       });
     });
   }
+
+  load();
 })();
 </script>
 </body>
