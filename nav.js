@@ -42,6 +42,7 @@ const NC_NAV_ITEMS = [
   { href: "products.html", label: "商品輸入" },
   { href: "order.html", label: "顧客入單" },
   { href: "orders.html", label: "訂單" },
+  { href: "customers.html", label: "顧客管理" },
   { href: "costs.html", label: "成本利潤" },
   { href: "reports.html", label: "報表" },
   { href: "settings.html", label: "設定" }

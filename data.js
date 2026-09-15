@@ -250,6 +250,15 @@ const DB = {
     this.save();
     return c;
   },
+  customerOrderCount(customerId) {
+    return this.state.orders.filter(o => o.customerId === customerId).length;
+  },
+  // 刪除顧客本身，不會動到他過去的訂單紀錄（訂單上還是會留著這個顧客
+  // 的名字/電話，只是這筆顧客資料以後不會再出現在搜尋或自動帶入裡）。
+  deleteCustomer(id) {
+    this.state.customers = this.state.customers.filter(c => c.id !== id);
+    return this.save();
+  },
 
   // ---- cart holds (預扣庫存, expire after settings.cartHoldHours) ----
   releaseExpiredHolds() {

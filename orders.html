@@ -108,7 +108,7 @@ ncBoot("orders.html", "訂單", (el) => {
   function renderDetail(orderId, opts) {
     opts = opts || {};
     const order = DB.getOrder(orderId);
-    const customer = DB.state.customers.find(c => c.id === order.customerId);
+    const customer = DB.state.customers.find(c => c.id === order.customerId) || { name: "（顧客已刪除）", phone: "", lineName: "", id: order.customerId };
     const items = DB.orderItemsFor(orderId);
     const remits = DB.listRemittances(orderId);
 

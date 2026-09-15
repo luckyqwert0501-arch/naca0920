@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>顧客管理 － 代購管理平台</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<script src="config.js"></script>
+<script src="data.js"></script>
+<script src="nav.js"></script>
+<script>
+ncBoot("customers.html", "顧客管理", (el) => {
+  let query = "";
+
+  function render() {
+    const customers = DB.state.customers
+      .filter(c => !query || (c.name||"").toLowerCase().includes(query.toLowerCase()) || (c.phone||"").includes(query) || (c.lineName||"").toLowerCase().includes(query.toLowerCase()))
+      .slice()
+      .sort((a, b) => (a.name||"").localeCompare((b.name||""), "zh-Hant"));
+
+    el.innerHTML = `
+      <div class="card">
+        <div class="field"><label>搜尋姓名／電話／Line名稱</label><input id="custSearch" value="${query}" placeholder="輸入關鍵字…"/></div>
+      </div>
+
+      <div class="card">
+        <h2>顧客清單（共 ${customers.length} 位）</h2>
+        <div class="grid-wrap">
+          <table class="data-table">
+            <thead><tr><th>姓名</th><th>電話</th><th>Line名稱</th><th>生日</th><th>累積訂單數</th><th></th></tr></thead>
+            <tbody>
+              ${customers.length ? customers.map(c => {
+                const orderCount = DB.customerOrderCount(c.id);
+                return `<tr>
+                  <td>${c.name||""}</td>
+                  <td>${c.phone||""}</td>
+                  <td>${c.lineName||""}</td>
+                  <td>${c.birthday||"－"}</td>
+                  <td>${orderCount}</td>
+                  <td><button class="btn btn-danger btn-small delCustBtn" data-id="${c.id}" data-count="${orderCount}" data-name="${(c.name||"").replace(/"/g,'&quot;')}">刪除</button></td>
+                </tr>`;
+              }).join("") : `<tr><td colspan="6" style="color:var(--ink-soft)">沒有符合的顧客</td></tr>`}
+            </tbody>
+          </table>
+        </div>
+      </div>`;
+
+    document.getElementById("custSearch").addEventListener("input", e => { query = e.target.value; render(); });
+    el.querySelectorAll(".delCustBtn").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const count = Number(btn.dataset.count) || 0;
+        const warn = count > 0
+          ? `「${btn.dataset.name}」有 ${count} 筆訂單紀錄，刪除顧客資料不會動到那些訂單，但之後在訂單頁面會顯示「顧客已刪除」，也不會再出現在搜尋/自動帶入裡。確定要刪除嗎？`
+          : `確定要刪除「${btn.dataset.name}」的顧客資料嗎？這個動作無法復原。`;
+        if (!confirm(warn)) return;
+        btn.disabled = true; btn.textContent = "刪除中…";
+        Promise.resolve(DB.deleteCustomer(btn.dataset.id)).then(() => render())
+          .catch(err => {
+            alert("刪除失敗，請檢查網路連線後再試一次。\n" + (err && err.message ? err.message : err));
+            render();
+          });
+      });
+    });
+  }
+
+  render();
+});
+</script>
+</body>
+</html>
