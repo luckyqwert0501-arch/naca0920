@@ -179,11 +179,13 @@ ncBoot("order.html", "顧客入單", (el) => {
         <div class="field"><label>收件地址</label><input id="rAddr" value="${existingCustomer ? (existingCustomer.address||"") : ""}"/></div>
         <div class="field"><label>寄送方式</label>
           <select id="rShip">
-            ${DB.listShippingMethods().map(m=>`<option value="${m.id}" data-fee="${m.fee}">${m.name}（建議運費 NT$${m.fee}）</option>`).join("")}
+            <option value="" data-fee="0">－ 尚未決定，讓顧客自己選 －</option>
+            ${DB.listShippingMethods().map(m=>`<option value="${m.name}" data-fee="${m.fee}">${m.name}（建議運費 NT$${m.fee}）</option>`).join("")}
           </select>
+          <p class="hint" style="margin:4px 0 0;">留在「尚未決定」，顧客點匯款回報連結時就會先讓他自己選寄送方式、填收件資訊。</p>
         </div>
         ${isReturning ? `<p style="color:var(--ink-soft); font-size:.85rem;">此為加單，運費不會重複收取。</p>` :
-          `<div class="field" style="max-width:160px"><label>本次運費 (TWD)</label><input id="rShipFee" type="number" value="${DB.listShippingMethods()[0]?.fee||0}"/></div>`}
+          `<div class="field" style="max-width:160px"><label>本次運費 (TWD)</label><input id="rShipFee" type="number" value="0"/></div>`}
       </div>
       <div class="row">
         <button class="btn btn-ghost" id="backBtn">← 返回購物車</button>
@@ -217,7 +219,7 @@ ncBoot("order.html", "顧客入單", (el) => {
           name: document.getElementById("rName").value,
           phone: document.getElementById("rPhone").value,
           address: document.getElementById("rAddr").value,
-          shipMethod: document.getElementById("rShip").selectedOptions[0].textContent
+          shipMethod: document.getElementById("rShip").value
         }
       });
       // 一定要等後端真的存好，再跳去訂單頁——訂單頁會重新跟後端要最新資料，

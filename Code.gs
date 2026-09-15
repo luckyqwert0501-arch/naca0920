@@ -323,12 +323,17 @@ function doGet(e) {
       const shippingFee = Number(order.shippingFee) || 0;
       const hasShippingInfo = !!(order.recipient && order.recipient.shipMethod);
       const batch = state.batches.find(b => b.id === order.batchId) || {};
+      const priorRemittances = (state.remittances || []).filter(r => r.orderId === order.id);
+      const reportedTotal = priorRemittances.reduce((s, r) => s + (Number(r.amount) || 0), 0);
+      const total = itemsSubtotal + shippingFee;
       return jsonOut_({
         exists: true, id: order.id, communityName: state.settings.communityName,
-        items: items, itemsSubtotal: itemsSubtotal, shippingFee: shippingFee, total: itemsSubtotal + shippingFee,
+        items: items, itemsSubtotal: itemsSubtotal, shippingFee: shippingFee, total: total,
         hasShippingInfo: hasShippingInfo, recipient: order.recipient || {},
         shippingMethods: state.settings.shippingMethods || [],
-        bankCode: batch.bankCode || "", bankAccount: batch.bankAccount || "", bankHolder: batch.bankHolder || ""
+        bankCode: batch.bankCode || "", bankAccount: batch.bankAccount || "", bankHolder: batch.bankHolder || "",
+        reportedCount: priorRemittances.length, reportedTotal: reportedTotal,
+        remainingDue: Math.max(0, total - reportedTotal)
       });
     }
 

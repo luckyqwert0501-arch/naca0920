@@ -52,7 +52,10 @@
         ${data.items.map(i => `<div class="cart-line"><span>${i.name} × ${i.qty}</span><span>${fmt(i.subtotal)}</span></div>`).join("")}
         <div class="cart-line"><span>商品小計</span><span>${fmt(data.itemsSubtotal)}</span></div>
         <div class="cart-line"><span>運費</span><span>${fmt(data.shippingFee)}</span></div>
-        <div class="cart-total"><span>應匯款總金額</span><span>${fmt(data.total)}</span></div>
+        <div class="cart-total"><span>訂單應付總額</span><span>${fmt(data.total)}</span></div>
+        ${data.reportedCount > 0 ? `
+        <div class="cart-line" style="margin-top:8px; border-top:1px solid var(--line); padding-top:12px;"><span>您已回報匯款（${data.reportedCount}筆）</span><span>${fmt(data.reportedTotal)}</span></div>
+        <div class="cart-total" style="color:${data.remainingDue>0?'var(--sakura)':'var(--matcha)'}"><span>${data.remainingDue>0?"尚需匯款":"已付清"}</span><span>${fmt(data.remainingDue)}</span></div>` : ""}
       </div>
       <div class="card">
         <h3 style="margin-top:0;">匯款資訊</h3>
@@ -116,9 +119,10 @@
       <div class="sub">訂單確認 － 第 2 步：匯款回報</div>
       ${itemsTableHtml(data)}
       <div class="card">
+        ${data.reportedCount > 0 ? `<p class="hint" style="margin-top:0;">如果這是加購後的第二次（或後續）匯款，這裡可以再回報一次，系統會自動累計。</p>` : ""}
         <div class="field"><label>您的姓名</label><input id="rName"/></div>
         <div class="field"><label>您的電話</label><input id="rPhone"/></div>
-        <div class="field"><label>實際匯款金額</label><input id="rAmount" type="number"/></div>
+        <div class="field"><label>本次實際匯款金額</label><input id="rAmount" type="number" value="${data.remainingDue > 0 ? data.remainingDue : ""}"/></div>
         <div class="field"><label>帳號後五碼</label><input id="rLast5" maxlength="5"/></div>
         <div id="rErr" style="color:var(--danger); font-size:.85rem;"></div>
         <button class="btn btn-primary" id="rSubmit" style="width:100%; margin-top:6px;">送出回報</button>
@@ -140,7 +144,7 @@
       }).then(res => res.json()).then(res => {
         if (res && res.error) throw new Error(res.error);
         app.innerHTML = `<div class="brand-mark">${brand}</div>
-          <div class="success-box">回報成功，謝謝您！店家確認匯款後會盡快為您安排出貨。</div>`;
+          <div class="success-box">回報成功，謝謝您！店家確認匯款後會盡快為您安排出貨。<br/><br/>如果之後這張訂單有加購、需要再匯款一次，用同一條連結回來就可以再回報一次。</div>`;
       }).catch(err => {
         btn.disabled = false; btn.textContent = "送出回報";
         errEl.textContent = "送出失敗，請檢查網路連線後再試一次。" + (err && err.message ? err.message : "");

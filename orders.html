@@ -170,7 +170,8 @@ ncBoot("orders.html", "訂單", (el) => {
         <div class="row">
           <div class="field"><label>寄送方式</label>
             <select id="editRShip">
-              ${DB.listShippingMethods().map(m => `<option ${order.recipient?.shipMethod===m.name?"selected":""}>${m.name}</option>`).join("")}
+              <option value="">－ 尚未決定 －</option>
+              ${DB.listShippingMethods().map(m => `<option value="${m.name}" ${order.recipient?.shipMethod===m.name?"selected":""}>${m.name}（運費 NT$${m.fee}）</option>`).join("")}
             </select>
           </div>
           <div class="field" style="max-width:160px"><label>運費(TWD)</label><input id="editShipFee" type="number" value="${order.shippingFee||0}"/></div>
@@ -201,6 +202,7 @@ ncBoot("orders.html", "訂單", (el) => {
 
       <div class="card no-print">
         <h2>匯款回報記錄 <button class="btn btn-ghost btn-small" id="refreshRemitBtn" style="margin-left:8px;">重新整理</button></h2>
+        ${remits.length ? `<p class="hint" style="margin-top:-4px;">已回報合計：${ncFmt(remits.reduce((s,r)=>s+(Number(r.amount)||0),0))}　／　訂單應付總額：${ncFmt(DB.orderTotal(order.id))}　／　尚缺：${ncFmt(Math.max(0, DB.orderTotal(order.id) - remits.reduce((s,r)=>s+(Number(r.amount)||0),0)))}</p>` : ""}
         ${remits.length ? remits.map(r => `
           <div class="cart-line">
             <span>${r.name}／${r.phone}・回報 ${ncFmt(r.amount)}・後五碼 ${r.last5}</span>
