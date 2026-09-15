@@ -98,7 +98,7 @@ ncBoot("reports.html", "報表", (el) => {
       </div>
 
       <div class="card print-sheet">
-        <div class="row no-print" style="align-items:center; justify-content:space-between;">
+        <div class="card-header-row no-print">
           <h2 style="margin:0;">顧客消費／利潤${scope==="current"?"（當期）":"（所有期別加總）"}</h2>
           <button class="btn btn-ghost btn-small" id="custToggleBtn">${custExpanded ? "收合 ▲" : "展開 ▼"}</button>
         </div>
@@ -124,7 +124,7 @@ ncBoot("reports.html", "報表", (el) => {
       </div>
 
       <div class="card print-sheet">
-        <div class="row no-print" style="align-items:center; justify-content:space-between;">
+        <div class="card-header-row no-print">
           <h2 style="margin:0;">期別損益總覽${scope==="current"?"（當期）":"（本期＋過去）"}</h2>
           <button class="btn btn-ghost btn-small" id="batchToggleBtn">${batchExpanded ? "收合 ▲" : "展開 ▼"}</button>
         </div>

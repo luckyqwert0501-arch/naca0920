@@ -24,7 +24,7 @@ ncBoot("orders.html", "訂單", (el) => {
   const params = new URLSearchParams(location.search);
   const openId = params.get("order");
 
-  let filters = { q: "", status: "", ship: "" };
+  let filters = { q: "", status: "", ship: "", pendingRemitOnly: params.get("pendingRemit") === "1" };
 
   function renderList() {
     const methods = DB.listShippingMethods();
@@ -52,12 +52,17 @@ ncBoot("orders.html", "訂單", (el) => {
             </select>
           </div>
         </div>
+        <label style="display:flex; align-items:center; gap:8px; font-size:.88rem; color:var(--ink-soft); margin-top:4px;">
+          <input type="checkbox" id="pendingRemitFilter" ${filters.pendingRemitOnly?"checked":""} style="width:18px; height:18px;"/>
+          只看有「待核對」匯款回報的訂單
+        </label>
         <div id="orderRows"></div>
       </div>`;
 
     document.getElementById("qInput").addEventListener("input", e => { filters.q = e.target.value; renderOrderRows(); });
     document.getElementById("statusFilter").addEventListener("change", e => { filters.status = e.target.value; renderOrderRows(); });
     document.getElementById("shipFilter").addEventListener("change", e => { filters.ship = e.target.value; renderOrderRows(); });
+    document.getElementById("pendingRemitFilter").addEventListener("change", e => { filters.pendingRemitOnly = e.target.checked; renderOrderRows(); });
     document.getElementById("refreshListBtn").addEventListener("click", () => { DB.refresh().then(renderList); });
     renderOrderRows();
   }
@@ -71,6 +76,7 @@ ncBoot("orders.html", "訂單", (el) => {
       if (filters.q && !(c && c.name.includes(filters.q))) return false;
       if (filters.status && o.status !== filters.status) return false;
       if (filters.ship && (o.recipient?.shipMethod || "") !== filters.ship) return false;
+      if (filters.pendingRemitOnly && !DB.listRemittances(o.id).some(r => r.status === "待核對")) return false;
       return true;
     });
     wrap.innerHTML = filtered.length ? filtered.map(o => {
@@ -133,7 +139,7 @@ ncBoot("orders.html", "訂單", (el) => {
       </div>
 
       <div class="card no-print">
-        <div class="row" style="align-items:center; justify-content:space-between;">
+        <div class="card-header-row">
           <h2 style="margin:0;">編輯訂單內容</h2>
           <button class="btn btn-danger btn-small" id="deleteOrderBtn">刪除整張訂單</button>
         </div>

@@ -50,10 +50,10 @@ ncBoot("dashboard.html", "總覽", (el) => {
         <h3>本期營收</h3>
         <h2 style="color:var(--kinari-gold)">${ncFmt(summary.revenue)}</h2>
       </div>
-      <div class="card" style="flex:1; min-width:180px;">
+      <a class="card" href="orders.html?pendingRemit=1" style="flex:1; min-width:180px; text-decoration:none; color:inherit; display:block; ${pendingReview.length ? "cursor:pointer;" : "cursor:default;"}">
         <h3>待核對匯款</h3>
         <h2 style="color:var(--sakura)">${pendingReview.length} 筆</h2>
-      </div>
+      </a>
     </div>
 
     ${lowStock.length ? `

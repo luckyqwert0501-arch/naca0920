@@ -200,6 +200,20 @@ table.data-table td{ padding:9px 8px; border-bottom:1px solid #F0EADD; }
 .badge-review{ background:#FBEFD6; color:var(--kinari-gold); }
 .badge-done{ background:#E3E8ED; color:var(--aizome); }
 
+/* ---------- Card header row (heading + action button) ----------
+   用在「標題＋一顆按鈕」這種排列，例如收合/展開、刪除整張訂單。
+   螢幕夠寬時左右並排，太窄時改成上下堆疊、按鈕滿版，避免文字跟按鈕擠在
+   一起重疊。 */
+.card-header-row{
+  display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap;
+}
+.card-header-row h2{ margin:0; flex:1 1 auto; min-width:0; }
+.card-header-row .btn{ flex-shrink:0; }
+@media (max-width: 480px){
+  .card-header-row{ flex-direction:column; align-items:flex-start; }
+  .card-header-row .btn{ width:100%; }
+}
+
 /* ---------- Quick-access tiles (dashboard) ---------- */
 .quick-links{ display:grid; grid-template-columns:repeat(auto-fit, minmax(160px, 1fr)); gap:14px; }
 .quick-links a{

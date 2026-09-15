@@ -103,6 +103,7 @@
         data.shippingFee = res.shippingFee;
         data.total = data.itemsSubtotal + res.shippingFee;
         data.hasShippingInfo = true;
+        data.recipient = { name, phone, address, shipMethod };
         renderRemitStep(data);
       }).catch(err => {
         btn.disabled = false; btn.textContent = "下一步";
@@ -120,6 +121,11 @@
       ${itemsTableHtml(data)}
       <div class="card">
         ${data.reportedCount > 0 ? `<p class="hint" style="margin-top:0;">如果這是加購後的第二次（或後續）匯款，這裡可以再回報一次，系統會自動累計。</p>` : ""}
+        ${data.recipient && data.recipient.name ? `
+        <label style="display:flex; align-items:center; gap:8px; font-size:.88rem; color:var(--ink-soft); margin-bottom:10px;">
+          <input type="checkbox" id="sameAsRecipient" style="width:18px; height:18px;"/>
+          收件者與匯款者為同一人
+        </label>` : ""}
         <div class="field"><label>您的姓名</label><input id="rName"/></div>
         <div class="field"><label>您的電話</label><input id="rPhone"/></div>
         <div class="field"><label>本次實際匯款金額</label><input id="rAmount" type="number" value="${data.remainingDue > 0 ? data.remainingDue : ""}"/></div>
@@ -127,6 +133,20 @@
         <div id="rErr" style="color:var(--danger); font-size:.85rem;"></div>
         <button class="btn btn-primary" id="rSubmit" style="width:100%; margin-top:6px;">送出回報</button>
       </div>`;
+
+    const sameBox = document.getElementById("sameAsRecipient");
+    if (sameBox) {
+      sameBox.addEventListener("change", () => {
+        const rNameEl = document.getElementById("rName"), rPhoneEl = document.getElementById("rPhone");
+        if (sameBox.checked) {
+          rNameEl.value = data.recipient.name || "";
+          rPhoneEl.value = data.recipient.phone || "";
+          rNameEl.disabled = true; rPhoneEl.disabled = true;
+        } else {
+          rNameEl.disabled = false; rPhoneEl.disabled = false;
+        }
+      });
+    }
 
     document.getElementById("rSubmit").addEventListener("click", () => {
       const name = document.getElementById("rName").value.trim();

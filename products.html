@@ -24,7 +24,7 @@ ncBoot("products.html", "商品輸入", (el) => {
     const products = DB.listProducts(batch.id);
     el.innerHTML = `
       <div class="card">
-        <div class="row" style="align-items:center; justify-content:space-between;">
+        <div class="card-header-row">
           <h2 style="margin:0;">庫存總覽</h2>
           <button class="btn btn-ghost btn-small" id="invToggleBtn">${invExpanded ? "收合 ▲" : "展開 ▼"}</button>
         </div>
@@ -37,7 +37,7 @@ ncBoot("products.html", "商品輸入", (el) => {
       </div>
 
       <div class="card">
-        <div class="row" style="align-items:center; justify-content:space-between;">
+        <div class="card-header-row">
           <h2 style="margin:0;">快速輸入</h2>
           <button class="btn btn-ghost btn-small" id="quickToggleBtn">${quickExpanded ? "收合 ▲" : "展開 ▼"}</button>
         </div>
@@ -58,7 +58,7 @@ ncBoot("products.html", "商品輸入", (el) => {
       </div>
 
       <div class="card">
-        <div class="row" style="align-items:center; justify-content:space-between;">
+        <div class="card-header-row">
           <h2 style="margin:0;">系列組合價規則</h2>
           <button class="btn btn-ghost btn-small" id="ruleToggleBtn">${ruleExpanded ? "收合 ▲" : "展開 ▼"}</button>
         </div>
