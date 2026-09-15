@@ -285,13 +285,18 @@ ncBoot("orders.html", "訂單", (el) => {
     });
     document.getElementById("statusSelect").addEventListener("change", e => DB.updateOrderStatus(order.id, e.target.value));
     document.getElementById("custEditSaveBtn").addEventListener("click", () => {
-      DB.updateCustomerFields(customer.id, {
+      const btn = document.getElementById("custEditSaveBtn");
+      btn.disabled = true; btn.textContent = "儲存中…";
+      Promise.resolve(DB.updateCustomerFields(customer.id, {
         name: document.getElementById("custEditName").value,
         phone: document.getElementById("custEditPhone").value,
         lineName: document.getElementById("custEditLine").value,
         birthday: document.getElementById("custEditBirthday").value
-      });
-      renderDetail(orderId);
+      })).then(() => renderDetail(orderId))
+        .catch(err => {
+          btn.disabled = false; btn.textContent = "儲存顧客資料";
+          alert("儲存失敗，請檢查網路連線後再試一次。\n" + (err && err.message ? err.message : err));
+        });
     });
     el.querySelectorAll(".confirmBtn").forEach(b => b.addEventListener("click", () => { DB.confirmRemittance(b.dataset.id); renderDetail(orderId); }));
     document.getElementById("msgBox").value = remittanceMessage(order, customer, items);

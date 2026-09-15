@@ -247,8 +247,7 @@ const DB = {
     const safePatch = { ...patch };
     if (c.birthday) delete safePatch.birthday;
     Object.assign(c, safePatch);
-    this.save();
-    return c;
+    return this.save();
   },
   customerOrderCount(customerId) {
     return this.state.orders.filter(o => o.customerId === customerId).length;
