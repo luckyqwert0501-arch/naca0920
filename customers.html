@@ -14,7 +14,7 @@
 ncBoot("customers.html", "顧客管理", (el) => {
   let query = "";
 
-  function render() {
+  function renderList() {
     const customers = DB.state.customers
       .filter(c => !query || (c.name||"").toLowerCase().includes(query.toLowerCase()) || (c.phone||"").includes(query) || (c.lineName||"").toLowerCase().includes(query.toLowerCase()))
       .slice()
@@ -27,59 +27,88 @@ ncBoot("customers.html", "顧客管理", (el) => {
 
       <div class="card">
         <h2>顧客清單（共 ${customers.length} 位）</h2>
-        <p class="hint">姓名／電話／Line名稱改完點旁邊空白處就會自動存檔；生日一旦設定過就不能再改。</p>
-        <div class="grid-wrap">
-          <table class="data-table">
-            <thead><tr><th>姓名</th><th>電話</th><th>Line名稱</th><th>生日</th><th>累積訂單數</th><th></th></tr></thead>
-            <tbody>
-              ${customers.length ? customers.map(c => {
-                const orderCount = DB.customerOrderCount(c.id);
-                return `<tr data-id="${c.id}">
-                  <td><input class="custEdit" data-id="${c.id}" data-field="name" value="${(c.name||"").replace(/"/g,'&quot;')}"/></td>
-                  <td><input class="custEdit" data-id="${c.id}" data-field="phone" value="${(c.phone||"").replace(/"/g,'&quot;')}"/></td>
-                  <td><input class="custEdit" data-id="${c.id}" data-field="lineName" value="${(c.lineName||"").replace(/"/g,'&quot;')}"/></td>
-                  <td><input class="custEdit" data-id="${c.id}" data-field="birthday" value="${(c.birthday||"").replace(/"/g,'&quot;')}" placeholder="例如 03/15" ${c.birthday?"disabled":""}/></td>
-                  <td>${orderCount}</td>
-                  <td><button class="btn btn-danger btn-small delCustBtn" data-id="${c.id}" data-count="${orderCount}" data-name="${(c.name||"").replace(/"/g,'&quot;')}">刪除</button></td>
-                </tr>`;
-              }).join("") : `<tr><td colspan="6" style="color:var(--ink-soft)">沒有符合的顧客</td></tr>`}
-            </tbody>
-          </table>
-        </div>
+        ${customers.length ? customers.map(c => `
+          <div class="cart-line">
+            <span>${c.name||"（未命名）"}${c.lineName ? "（Line: "+c.lineName+"）" : ""}</span>
+            <span style="display:flex; align-items:center; gap:8px;">
+              <span style="color:var(--ink-soft)">${c.phone||"－"}</span>
+              <button class="btn btn-ghost btn-small openCustBtn" data-id="${c.id}">查看</button>
+            </span>
+          </div>`).join("") : `<p style="color:var(--ink-soft)">沒有符合的顧客</p>`}
       </div>`;
 
-    document.getElementById("custSearch").addEventListener("input", e => { query = e.target.value; render(); });
+    document.getElementById("custSearch").addEventListener("input", e => { query = e.target.value; renderList(); });
+    el.querySelectorAll(".openCustBtn").forEach(btn => btn.addEventListener("click", () => renderDetail(btn.dataset.id)));
+  }
 
-    el.querySelectorAll(".custEdit").forEach(input => {
-      input.addEventListener("change", () => {
-        const id = input.dataset.id, field = input.dataset.field;
-        input.disabled = true;
-        Promise.resolve(DB.updateCustomerFields(id, { [field]: input.value })).then(() => render())
-          .catch(err => {
-            alert("儲存失敗，請檢查網路連線後再試一次。\n" + (err && err.message ? err.message : err));
-            render();
-          });
-      });
+  function renderDetail(custId) {
+    const c = DB.state.customers.find(x => x.id === custId);
+    if (!c) { renderList(); return; }
+    const orderCount = DB.customerOrderCount(c.id);
+
+    el.innerHTML = `
+      <div class="card">
+        <button class="btn btn-ghost btn-small" id="backToListBtn">← 回顧客清單</button>
+      </div>
+
+      <div class="card">
+        <h2>顧客資料</h2>
+        <p class="hint">累積訂單數：${orderCount} 筆</p>
+        <div class="row">
+          <div class="field"><label>姓名</label><input id="custName" value="${(c.name||"").replace(/"/g,'&quot;')}"/></div>
+          <div class="field"><label>電話</label><input id="custPhone" value="${(c.phone||"").replace(/"/g,'&quot;')}"/></div>
+        </div>
+        <div class="row">
+          <div class="field"><label>Line名稱</label><input id="custLine" value="${(c.lineName||"").replace(/"/g,'&quot;')}"/></div>
+          <div class="field">
+            <label>生日${c.birthday ? "（已設定，不會再變更）" : ""}</label>
+            <input id="custBirthday" value="${(c.birthday||"").replace(/"/g,'&quot;')}" placeholder="例如 03/15" ${c.birthday?"disabled":""}/>
+          </div>
+        </div>
+        <div class="field"><label>地址</label><input id="custAddr" value="${(c.address||"").replace(/"/g,'&quot;')}"/></div>
+        <button class="btn btn-primary" id="custSaveBtn">儲存修改</button>
+      </div>
+
+      <div class="card">
+        <h2>刪除顧客</h2>
+        <p class="hint">${orderCount > 0 ? `這位顧客有 ${orderCount} 筆訂單紀錄，刪除顧客資料不會動到那些訂單，但之後在訂單頁面會顯示「顧客已刪除」，也不會再出現在搜尋/自動帶入裡。` : "這位顧客目前沒有訂單紀錄。"}</p>
+        <button class="btn btn-danger" id="custDeleteBtn">刪除這位顧客</button>
+      </div>`;
+
+    document.getElementById("backToListBtn").addEventListener("click", renderList);
+
+    document.getElementById("custSaveBtn").addEventListener("click", () => {
+      const btn = document.getElementById("custSaveBtn");
+      btn.disabled = true; btn.textContent = "儲存中…";
+      Promise.resolve(DB.updateCustomerFields(c.id, {
+        name: document.getElementById("custName").value,
+        phone: document.getElementById("custPhone").value,
+        lineName: document.getElementById("custLine").value,
+        address: document.getElementById("custAddr").value,
+        birthday: document.getElementById("custBirthday").value
+      })).then(() => renderDetail(c.id))
+        .catch(err => {
+          btn.disabled = false; btn.textContent = "儲存修改";
+          alert("儲存失敗，請檢查網路連線後再試一次。\n" + (err && err.message ? err.message : err));
+        });
     });
 
-    el.querySelectorAll(".delCustBtn").forEach(btn => {
-      btn.addEventListener("click", () => {
-        const count = Number(btn.dataset.count) || 0;
-        const warn = count > 0
-          ? `「${btn.dataset.name}」有 ${count} 筆訂單紀錄，刪除顧客資料不會動到那些訂單，但之後在訂單頁面會顯示「顧客已刪除」，也不會再出現在搜尋/自動帶入裡。確定要刪除嗎？`
-          : `確定要刪除「${btn.dataset.name}」的顧客資料嗎？這個動作無法復原。`;
-        if (!confirm(warn)) return;
-        btn.disabled = true; btn.textContent = "刪除中…";
-        Promise.resolve(DB.deleteCustomer(btn.dataset.id)).then(() => render())
-          .catch(err => {
-            alert("刪除失敗，請檢查網路連線後再試一次。\n" + (err && err.message ? err.message : err));
-            render();
-          });
-      });
+    document.getElementById("custDeleteBtn").addEventListener("click", () => {
+      const warn = orderCount > 0
+        ? `「${c.name}」有 ${orderCount} 筆訂單紀錄，刪除顧客資料不會動到那些訂單，但之後在訂單頁面會顯示「顧客已刪除」。確定要刪除嗎？`
+        : `確定要刪除「${c.name}」的顧客資料嗎？這個動作無法復原。`;
+      if (!confirm(warn)) return;
+      const btn = document.getElementById("custDeleteBtn");
+      btn.disabled = true; btn.textContent = "刪除中…";
+      Promise.resolve(DB.deleteCustomer(c.id)).then(() => renderList())
+        .catch(err => {
+          btn.disabled = false; btn.textContent = "刪除這位顧客";
+          alert("刪除失敗，請檢查網路連線後再試一次。\n" + (err && err.message ? err.message : err));
+        });
     });
   }
 
-  render();
+  renderList();
 });
 </script>
 </body>
