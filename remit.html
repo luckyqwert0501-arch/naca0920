@@ -53,8 +53,8 @@
         <div class="cart-line"><span>商品小計</span><span>${fmt(data.itemsSubtotal)}</span></div>
         <div class="cart-line"><span>運費</span><span>${fmt(data.shippingFee)}</span></div>
         <div class="cart-total"><span>訂單應付總額</span><span>${fmt(data.total)}</span></div>
-        <div class="cart-line" style="margin-top:8px; border-top:1px solid var(--line); padding-top:12px;"><span>已回報匯款金額（${data.reportedCount}筆）</span><span>${fmt(data.reportedTotal)}</span></div>
-        <div class="cart-total" style="color:${data.remainingDue>0?'var(--sakura)':'var(--matcha)'}"><span>${data.remainingDue>0?"待補匯款金額":"已付清"}</span><span>${fmt(data.remainingDue)}</span></div>
+        <div class="cart-line" style="margin-top:8px; border-top:1px solid var(--line); padding-top:12px;"><span>已回報匯款金額</span><span>${fmt(data.reportedTotal)}</span></div>
+        <div class="cart-line"><span style="color:${data.remainingDue>0?'var(--danger)':'var(--matcha)'}; font-weight:600;">${data.remainingDue>0?"待補匯款金額":"已付清"}</span><span style="color:${data.remainingDue>0?'var(--danger)':'var(--matcha)'}; font-weight:600;">${fmt(data.remainingDue)}</span></div>
       </div>
       <div class="card">
         <h3 style="margin-top:0;">匯款資訊</h3>
